@@ -3,6 +3,7 @@
 """
 import pprint
 
+from util import generate_keys
 from hash import hash_value
 from server import Server
 
@@ -21,16 +22,6 @@ def build_server_list(num_servers):
     for i in range(num_servers):
         name = server_name_fmt.format(id=str(i))
         server_list.append(Server(name))
-
-
-def generate_keys(num_keys):
-    key_fmt = "cached_data_{id}"
-
-    keys = []
-    for i in range(num_keys):
-        keys.append(key_fmt.format(id=str(i)))
-
-    return keys
 
 
 def get_servers(keys):
@@ -52,18 +43,23 @@ def main():
     keys = generate_keys(num_keys)
 
     result1 = get_servers(keys)
-    print(f"\nMapping of keys to server hosting key with {len(server_list)} servers:")
-    pp.pprint(result1)
 
     # Add a server
-    server_list.append(server_name_fmt.format(id=num_servers))
+    name = server_name_fmt.format(id=num_servers)
+    server_list.append(Server(name))
 
     result2 = get_servers(keys)
-    print(f"\nMapping of keys to server hosting key with {len(server_list)} servers:")
-    pp.pprint(result2)
 
     # Calculate the number of changes
     changes = [changed for changed in result1 if result1[changed] != result2[changed]]
+
+    # Print results
+    print(f"\nMapping of keys to server hosting key with {len(server_list) - 1} servers:")
+    pp.pprint(result1)
+
+    print(f"\nMapping of keys to server hosting key with {len(server_list)} servers:")
+    pp.pprint(result2)
+
     print(f"\n A total of {len(changes)} out of {len(keys)} keys have changed hosts:")
     pp.pprint(changes)
 

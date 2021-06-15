@@ -10,3 +10,4 @@ Chord DHT Implementation
 | Hash function | `chord/hash.py` |
 | Mod-N load balancer | `chord/modn_load_balancer.py` |
 | Consistent load balancer | `chord/consistent_load_balancer.py` |
+| Naive routing | `chord/node.py` |

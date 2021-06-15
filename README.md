@@ -6,5 +6,6 @@ Chord DHT Implementation
 
 | Requirement | File |
 |-------------|------|
-| Chord Worksheet | worksheet.md |
+| Chord Worksheet | `worksheet.md` |
+| Hash function | `chord/hash.py` |
 

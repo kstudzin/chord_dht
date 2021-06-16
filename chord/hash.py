@@ -5,6 +5,9 @@ Implemented using md5. All values are 1 byte, i.e., 0-255
 import hashlib
 
 
+NUM_BITS = 8
+
+
 def hash_value(value):
     """ Computes the least significant byte of the md5 for the given input
 

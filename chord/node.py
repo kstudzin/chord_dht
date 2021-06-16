@@ -33,13 +33,13 @@ class Node:
 
     def fix_fingers(self):
         i = 0
-        next_key = self.digest_id + pow(2, i) % pow(2, NUM_BITS)
+        next_key = (self.digest_id + pow(2, i)) % (pow(2, NUM_BITS) - 1)
         while i < NUM_BITS:
             next_finger = self.find_successor(next_key, 0)[0]
             self.fingers.append(next_finger)
 
             i += 1
-            next_key = self.digest_id + pow(2, i) % pow(2, NUM_BITS)
+            next_key = (self.digest_id + pow(2, i)) % (pow(2, NUM_BITS) - 1)
 
     def find_successor(self, digest, hops):
         next_id = self.successor.get_id()
@@ -75,12 +75,11 @@ class ChordNode:
 
     def set_successor(self, successor):
         self.successor = successor
-        self.fingers.append(successor)
 
     def fix_fingers(self):
-        logging.info(f"Building finger table for {self.name} {self.digest_id}")
+        logging.info(f"Building finger table for {self.name} (Digest: {self.digest_id})")
         i = 0
-        next_key = self.digest_id + pow(2, i) % (pow(2, NUM_BITS) - 1)
+        next_key = (self.digest_id + pow(2, i)) % (pow(2, NUM_BITS) - 1)
         while i < NUM_BITS:
             next_finger = self.find_successor(next_key, 0)[0]
             self.fingers.append(next_finger)
@@ -129,6 +128,8 @@ class ChordNode:
                         or finger.get_id() < digest):
                     logging.debug(f"        Yes, returning finger {finger.get_id()} (4)")
                     return finger
+
+        return self.successor
 
 
 def build_nodes(num_nodes, node_type):

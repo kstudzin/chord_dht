@@ -9,11 +9,11 @@ def test_naive_hops():
 
     nodes = build_nodes(50, Node)
     avg_hops = run_experiment(nodes, keys)
-    assert math.isclose(avg_hops, 22.94, abs_tol=0.01)
+    assert math.isclose(avg_hops, 25.28, abs_tol=0.01)
 
     nodes = build_nodes(100, Node)
     avg_hops = run_experiment(nodes, keys)
-    assert math.isclose(avg_hops, 41.24, abs_tol=0.01)
+    assert math.isclose(avg_hops, 48.9, abs_tol=0.01)
 
 
 def test_chord_hops():
@@ -21,7 +21,7 @@ def test_chord_hops():
 
     nodes = build_nodes(50, ChordNode)
     avg_hops = run_experiment(nodes, keys)
-    assert math.isclose(avg_hops, 3.57, abs_tol=0.01)
+    assert math.isclose(avg_hops, 3.69, abs_tol=0.01)
 
     nodes = build_nodes(100, ChordNode)
     avg_hops = run_experiment(nodes, keys)

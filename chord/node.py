@@ -1,16 +1,12 @@
 import argparse
 import logging
-import math
 import pprint
 import statistics
-import sys
 
 from sortedcontainers import SortedDict
 
 from util import generate_keys
 from hash import hash_value, NUM_BITS
-
-pp = pprint.PrettyPrinter()
 
 
 class Node:
@@ -138,10 +134,12 @@ def build_nodes(num_nodes, node_type, node_name_prefix="node"):
     node_name_fmt = "{prefix}_{id}"
     node_ids = SortedDict()
 
-    for i in range(num_nodes):
+    i = 0
+    while len(node_ids) < num_nodes:
         name = node_name_fmt.format(prefix=node_name_prefix, id=str(i))
         digest = hash_value(name)
         node_ids[digest] = name
+        i += 1
 
     # List of nodes to return
     nodes = []
@@ -213,6 +211,7 @@ def config_parser():
 
 
 def main():
+    pp = pprint.PrettyPrinter()
     parser = config_parser()
     args = parser.parse_args()
 

@@ -1,3 +1,4 @@
+import logging
 import math
 import pprint
 import statistics
@@ -77,61 +78,57 @@ class ChordNode:
         self.fingers.append(successor)
 
     def fix_fingers(self):
-        print(f"Calling fix_fingers on {self.digest_id}. modulus: {pow(2, NUM_BITS) - 1}")
+        logging.info(f"Building finger table for {self.name} {self.digest_id}")
         i = 0
         next_key = self.digest_id + pow(2, i) % (pow(2, NUM_BITS) - 1)
         while i < NUM_BITS:
-            print(f"  Finding successor of {next_key}")
             next_finger = self.find_successor(next_key, 0)[0]
             self.fingers.append(next_finger)
-            print(f"  Found finger {i} is {next_finger.get_id()}")
+            logging.info(f"  Found finger {i} is successor({next_key}) = {next_finger.get_id()}")
 
             i += 1
             next_key = (self.digest_id + pow(2, i)) % (pow(2, NUM_BITS) - 1)
-            # print(next_key) if self.digest_id == 244 else 0
 
     def find_successor(self, digest, hops):
-        # print(f"    Current node: {self.digest_id}")
         if digest == self.digest_id:
             return self, hops
 
         next_id = self.successor.get_id()
 
-        print(f"    Is id {digest} contained in ({self.digest_id}, {next_id}]?")
+        logging.debug(f"    Is id {digest} contained in ({self.digest_id}, {next_id}]?")
         if next_id > self.digest_id:
             if self.digest_id < digest <= next_id:
-                print(f"      Yes, returning successor {next_id} (1) hops: {hops}")
+                logging.debug(f"      Yes, returning successor {next_id} (1) hops: {hops}")
                 return self.successor, hops + 1
             else:
-                print(f"      No, finding closest preceding node (1)")
+                logging.debug(f"      No, finding closest preceding node (1)")
                 next_node = self.closest_preceding_node(digest)
                 return next_node.find_successor(digest, hops + 1)
         else:
-            # Handle the case where this node has the highest digest
+            # Handle the case where this node is the last in the ring, i.e. where this node
+            # has a higher digest than its successor
             if digest > self.digest_id or digest <= next_id:
-                print(f"      Yes, returning successor {next_id} (2)")
+                logging.debug(f"      Yes, returning successor {next_id} (2)")
                 return self.successor, hops + 1
             else:
-                print(f"      No, finding closest preceding node (2)")
+                logging.debug(f"      No, finding closest preceding node (2)")
                 next_node = self.closest_preceding_node(digest)
                 return next_node.find_successor(digest, hops + 1)
 
     def closest_preceding_node(self, digest):
-        print(f"      No fingers") if not self.fingers else print(f"      {len(self.fingers)} fingers")
+
         for finger in reversed(self.fingers):
-            print(f"      Is {finger.get_id()} in ({self.digest_id, digest})?")
+
+            logging.debug(f"      Is {finger.get_id()} in ({self.digest_id, digest})?")
             if self.digest_id < digest:
                 if self.digest_id < finger.get_id() < digest:
-                    print(f"        Yes, returning finger {finger.get_id()} (3)")
+                    logging.debug(f"        Yes, returning finger {finger.get_id()} (3)")
                     return finger
             elif self.digest_id > digest:
                 if (self.digest_id < finger.get_id()
                         or finger.get_id() < digest):
-                    print(f"        Yes, returning finger {finger.get_id()} (4)")
+                    logging.debug(f"        Yes, returning finger {finger.get_id()} (4)")
                     return finger
-
-        print(f"      Returning current {self.successor.digest_id}")
-        # return self.successor
 
 
 def build_nodes(num_nodes, node_type):
@@ -142,8 +139,6 @@ def build_nodes(num_nodes, node_type):
         name = node_name_fmt.format(id=str(i))
         digest = hash_value(name)
         node_ids[digest] = name
-
-    pp.pprint(node_ids.keys())
 
     # List of nodes to return
     nodes = []
@@ -165,9 +160,7 @@ def build_nodes(num_nodes, node_type):
     next_node.set_successor(last_node)
     nodes.append(last_node)
 
-    # print(f"Number of nodes: {len(nodes)}")
     for node in nodes:
-        # print(f"Calling fix_fingers for {node.get_id()} ({type(node)})")
         node.fix_fingers()
 
     return nodes
@@ -180,7 +173,8 @@ def run_experiment(num_nodes, num_keys, node_type):
     hops_tracker = []
     starting_node = nodes[0]
     for key in keys:
-        print(f"Testing key {key}")
+        logging.debug(f"Testing key {key}")
+
         node, hops = starting_node.find_successor(hash_value(key), 0)
         hops_tracker.append(hops)
 
@@ -260,14 +254,6 @@ def main():
     print(f"Average hops with {num_nodes} nodes is {avg_hops}")
 
     # assert avg_hops == 40
-
-    # nodes = build_nodes(100, ChordNode)
-    # for test_node in nodes:
-    #     if test_node.get_id() == 159:
-    #         fingers = test_node.fingers
-    #         finger_table = [{"position": i, "id": finger.get_id(), "name": finger.get_name()}
-    #                         for i, finger in enumerate(fingers)]
-    #         pp.pprint({"name": test_node.get_name(), "id": test_node.get_id(), "fingers": finger_table})
 
 
 if __name__ == "__main__":

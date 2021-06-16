@@ -1,3 +1,8 @@
+import logging
+
+logging.basicConfig(filename='example.log', encoding='utf-8', level=logging.DEBUG)
+
+
 def generate_keys(num_keys):
     key_fmt = "cached_data_{id}"
 

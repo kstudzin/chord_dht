@@ -1,7 +1,9 @@
+import argparse
 import logging
 import math
 import pprint
 import statistics
+import sys
 
 from sortedcontainers import SortedDict
 
@@ -132,12 +134,12 @@ class ChordNode:
         return self.successor
 
 
-def build_nodes(num_nodes, node_type):
-    node_name_fmt = "node_{id}"
+def build_nodes(num_nodes, node_type, node_name_prefix="node"):
+    node_name_fmt = "{prefix}_{id}"
     node_ids = SortedDict()
 
     for i in range(num_nodes):
-        name = node_name_fmt.format(id=str(i))
+        name = node_name_fmt.format(prefix=node_name_prefix, id=str(i))
         digest = hash_value(name)
         node_ids[digest] = name
 
@@ -167,10 +169,7 @@ def build_nodes(num_nodes, node_type):
     return nodes
 
 
-def run_experiment(num_nodes, num_keys, node_type):
-    nodes = build_nodes(num_nodes, node_type)
-    keys = generate_keys(num_keys)
-
+def run_experiment(nodes, keys):
     hops_tracker = []
     starting_node = nodes[0]
     for key in keys:
@@ -182,79 +181,69 @@ def run_experiment(num_nodes, num_keys, node_type):
     return statistics.mean(hops_tracker)
 
 
+def node_table(nodes):
+    table = [{"id": node.get_id(), "name": node.get_name()} for node in nodes]
+    return {"network": table}
+
+
+def finger_table(node):
+    fingers = node.fingers
+    table = [{"position": i, "id": finger.get_id(), "name": finger.get_name()}
+             for i, finger in enumerate(fingers)]
+    return {"name": node.get_name(), "id": node.get_id(), "fingers": table}
+
+
+def config_parser():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('num_nodes', type=int, help='number of nodes to use for tests')
+    parser.add_argument('num_keys', type=int, help='number of keys to run tests on')
+    parser.add_argument('--naive-nodes', action='store_const', const=Node,
+                        help='Build naive nodes')
+    parser.add_argument('--chord-nodes', action='store_const', const=ChordNode,
+                        help='Build chord nodes')
+    parser.add_argument('--key-prefix', '-k', type=str, default='data',
+                        help='prefix of key name')
+    parser.add_argument('--node_prefix', '-n', type=str, default='node',
+                        help='prefix of node name')
+    parser.add_argument('--action', '-a', choices=['hops', 'network', 'fingers'], nargs='+', default='hops',
+                        help='')
+
+    return parser
+
+
 def main():
-    # ----------------------------------------------------
-    # Test naive routing
-    # ----------------------------------------------------
-    print("\nCalculating average hops for naive routing...\n")
-    num_nodes = 50
-    num_keys = 100
-    avg_hops = run_experiment(num_nodes, num_keys, Node)
-    print(f"Average hops with {num_nodes} nodes is {avg_hops}")
+    parser = config_parser()
+    args = parser.parse_args()
 
-    assert math.isclose(avg_hops, 22.38, abs_tol=0.01)
+    num_nodes = args.num_nodes
+    num_keys = args.num_keys
+    key_prefix = args.key_prefix
+    node_prefix = args.node_prefix
+    action = args.action
 
-    num_nodes = 100
-    avg_hops = run_experiment(num_nodes, num_keys, Node)
-    print(f"Average hops with {num_nodes} nodes is {avg_hops}")
+    # Retrieve first non None value
+    node_type = next(node_type
+                     for node_type in [args.chord_nodes, args.naive_nodes, ChordNode]
+                     if node_type is not None)
 
-    assert avg_hops == 40
+    nodes = build_nodes(num_nodes, node_type, node_prefix)
+    keys = generate_keys(num_keys, key_prefix=key_prefix)
 
-    # The number of hops to find a key using naive routing should be
-    # proportional to the number of nodes in the network. Specifically
-    # it should be close to n/2 which is what we see here
+    if 'hops' in action:
+        avg_hops = run_experiment(nodes, keys)
+        print(f"Average hops with {len(nodes)} nodes is {avg_hops}")
 
-    # ----------------------------------------------------
-    # Test finger table
-    # ----------------------------------------------------
-    print("\nBuild network...\n")
-    nodes = build_nodes(10, ChordNode)
-    node_table = [{"id": node.get_id(), "name": node.get_name()} for node in nodes]
-    pp.pprint({"network": node_table})
+    if 'network' in action:
+        print("Nodes in the network: ")
+        pp.pprint(node_table(nodes))
 
-    assert nodes[0].get_id() == 24 and nodes[0].get_name() == "node_3"
-    assert nodes[1].get_id() == 32 and nodes[1].get_name() == "node_2"
-    assert nodes[2].get_id() == 46 and nodes[2].get_name() == "node_6"
-    assert nodes[3].get_id() == 109 and nodes[3].get_name() == "node_4"
-    assert nodes[4].get_id() == 145 and nodes[4].get_name() == "node_8"
-    assert nodes[5].get_id() == 150 and nodes[5].get_name() == "node_7"
-    assert nodes[6].get_id() == 160 and nodes[6].get_name() == "node_0"
-    assert nodes[7].get_id() == 163 and nodes[7].get_name() == "node_1"
-    assert nodes[8].get_id() == 241 and nodes[8].get_name() == "node_9"
-    assert nodes[9].get_id() == 244 and nodes[9].get_name() == "node_5"
+    if 'fingers' in action:
+        print("Finger table for first node: ")
+        pp.pprint(finger_table(nodes[0]))
 
-    print("\nRetrieve finger table...\n")
-    test_node = nodes[-1]
-    fingers = test_node.fingers
-    finger_table = [{"position": i, "id": finger.get_id(), "name": finger.get_name()}
-                    for i, finger in enumerate(fingers)]
-    pp.pprint({"name": test_node.get_name(), "id": test_node.get_id(), "fingers": finger_table})
-    #
-    # assert fingers[0].get_id() == 32 and fingers[0].get_name() == "node_2"
-    # assert fingers[1].get_id() == 32 and fingers[1].get_name() == "node_2"
-    # assert fingers[2].get_id() == 32 and fingers[2].get_name() == "node_2"
-    # assert fingers[3].get_id() == 32 and fingers[3].get_name() == "node_2"
-    # assert fingers[4].get_id() == 46 and fingers[4].get_name() == "node_6"
-    # assert fingers[5].get_id() == 109 and fingers[5].get_name() == "node_4"
-    # assert fingers[6].get_id() == 109 and fingers[6].get_name() == "node_4"
-    # assert fingers[7].get_id() == 160 and fingers[7].get_name() == "node_0"
-
-    # ----------------------------------------------------
-    # Test chord routing
-    # ----------------------------------------------------
-    print("\nCalculating average hops for chord routing...\n")
-    num_nodes = 50
-    num_keys = 100
-    avg_hops = run_experiment(num_nodes, num_keys, ChordNode)
-    print(f"Average hops with {num_nodes} nodes is {avg_hops}")
-
-    # assert math.isclose(avg_hops, 22.38, abs_tol=0.01)
-
-    num_nodes = 100
-    avg_hops = run_experiment(num_nodes, num_keys, ChordNode)
-    print(f"Average hops with {num_nodes} nodes is {avg_hops}")
-
-    # assert avg_hops == 40
+        print("Finger table for last node: ")
+        pp.pprint(finger_table(nodes[-1]))
 
 
 if __name__ == "__main__":

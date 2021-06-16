@@ -8,6 +8,8 @@ from sortedcontainers import SortedDict
 from util import generate_keys, open_closed, open_open
 from hash import hash_value, NUM_BITS
 
+pp = pprint.PrettyPrinter()
+
 
 class Node:
 
@@ -167,12 +169,12 @@ def config_parser():
                         help='prefix of node name')
     parser.add_argument('--action', '-a', choices=['hops', 'network', 'fingers'], nargs='+', default='hops',
                         help='')
+    parser.add_argument('--no-formatting', action='store_const', const=print, default=pp.pprint)
 
     return parser
 
 
 def main():
-    pp = pprint.PrettyPrinter()
     parser = config_parser()
     args = parser.parse_args()
 
@@ -181,6 +183,7 @@ def main():
     key_prefix = args.key_prefix
     node_prefix = args.node_prefix
     action = args.action
+    printer = args.no_formatting
 
     # Retrieve first non None value
     node_type = next(node_type
@@ -196,14 +199,14 @@ def main():
 
     if 'network' in action:
         print("Nodes in the network: ")
-        pp.pprint(node_table(nodes))
+        printer(node_table(nodes))
 
     if 'fingers' in action:
         print("Finger table for first node: ")
-        pp.pprint(finger_table(nodes[0]))
+        printer(finger_table(nodes[0]))
 
         print("Finger table for last node: ")
-        pp.pprint(finger_table(nodes[-1]))
+        printer(finger_table(nodes[-1]))
 
 
 if __name__ == "__main__":

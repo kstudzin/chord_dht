@@ -63,6 +63,7 @@ def test_chord_node_creation():
 
     verify_successors(nodes)
 
+
 def test_fingers_first_node():
     nodes = build_nodes(10, Node)
     fingers = nodes[0].fingers

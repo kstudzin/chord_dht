@@ -169,7 +169,8 @@ def config_parser():
                         help='prefix of node name')
     parser.add_argument('--action', '-a', choices=['hops', 'network', 'fingers'], nargs='+', default='hops',
                         help='')
-    parser.add_argument('--no-formatting', action='store_const', const=print, default=pp.pprint)
+    parser.add_argument('--no-formatting', action='store_const', const=print, default=pp.pprint,
+                        help='print raw data without formatting')
 
     return parser
 

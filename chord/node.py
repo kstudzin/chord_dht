@@ -5,7 +5,7 @@ import statistics
 
 from sortedcontainers import SortedDict
 
-from util import generate_keys
+from util import generate_keys, open_closed, open_open
 from hash import hash_value, NUM_BITS
 
 
@@ -68,40 +68,24 @@ class ChordNode(Node):
         next_id = self.successor.get_id()
 
         logging.debug(f"    Is id {digest} contained in ({self.digest_id}, {next_id}]?")
-        if next_id > self.digest_id:
-            if self.digest_id < digest <= next_id:
-                logging.debug(f"      Yes, returning successor {next_id} (1) hops: {hops}")
-                return self.successor, hops + 1
-            else:
-                logging.debug(f"      No, finding closest preceding node (1)")
-                next_node = self.closest_preceding_node(digest)
-                return next_node.find_successor(digest, hops + 1)
+        if open_closed(self.digest_id, next_id, digest):
+            logging.debug(f"      Yes, returning successor {next_id} hops: {hops}")
+            return self.successor, hops + 1
         else:
-            # Handle the case where this node is the last in the ring, i.e. where this node
-            # has a higher digest than its successor
-            if digest > self.digest_id or digest <= next_id:
-                logging.debug(f"      Yes, returning successor {next_id} (2)")
-                return self.successor, hops + 1
-            else:
-                logging.debug(f"      No, finding closest preceding node (2)")
-                next_node = self.closest_preceding_node(digest)
-                return next_node.find_successor(digest, hops + 1)
+            logging.debug(f"      No, finding closest preceding node")
+            next_node = self.closest_preceding_node(digest)
+            return next_node.find_successor(digest, hops + 1)
 
     def closest_preceding_node(self, digest):
 
         for finger in reversed(self.fingers):
 
             logging.debug(f"      Is {finger.get_id()} in ({self.digest_id, digest})?")
-            if self.digest_id < digest:
-                if self.digest_id < finger.get_id() < digest:
-                    logging.debug(f"        Yes, returning finger {finger.get_id()} (3)")
-                    return finger
-            elif self.digest_id > digest:
-                if (self.digest_id < finger.get_id()
-                        or finger.get_id() < digest):
-                    logging.debug(f"        Yes, returning finger {finger.get_id()} (4)")
-                    return finger
+            if open_open(self.digest_id, digest, finger.get_id()):
+                logging.debug(f"        Yes, returning finger {finger.get_id()}")
+                return finger
 
+        logging.debug(f"      Finger not found. Returning successor {self.successor.get_id()}")
         return self.successor
 
 

@@ -13,3 +13,17 @@ def generate_keys(num_keys, key_prefix="cached_data"):
         i += 1
 
     return keys
+
+
+def open_closed(start, end, test):
+    if start < end:
+        return start < test <= end
+    else:
+        return test > start or test <= end
+
+
+def open_open(start, end, test):
+    if start < end:
+        return start < test < end
+    else:
+        return test > start or test < end

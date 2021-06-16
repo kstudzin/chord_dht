@@ -134,6 +134,8 @@ def build_nodes(num_nodes, node_type, node_name_prefix="node"):
     node_name_fmt = "{prefix}_{id}"
     node_ids = SortedDict()
 
+    # Node names may hash to the same value. Check that the actual number of
+    # nodes we are looking for has been created before exiting
     i = 0
     while len(node_ids) < num_nodes:
         name = node_name_fmt.format(prefix=node_name_prefix, id=str(i))

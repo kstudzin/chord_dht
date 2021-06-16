@@ -1,6 +1,6 @@
 import logging
 
-logging.basicConfig(filename='example.log', encoding='utf-8', level=logging.DEBUG)
+logging.basicConfig(filename='chord.log', encoding='utf-8', level=logging.WARN)
 
 
 def generate_keys(num_keys, key_prefix="cached_data"):

@@ -1,9 +1,13 @@
+import math
+import pprint
 import statistics
 
 from sortedcontainers import SortedDict
 
 from util import generate_keys
 from hash import hash_value, NUM_BITS
+
+pp = pprint.PrettyPrinter()
 
 
 class Node:
@@ -109,9 +113,13 @@ def main():
     avg_hops = run_experiment(num_nodes, num_keys)
     print(f"Average hops with {num_nodes} nodes is {avg_hops}")
 
+    assert math.isclose(avg_hops, 22.38, abs_tol=0.01)
+
     num_nodes = 100
     avg_hops = run_experiment(num_nodes, num_keys)
     print(f"Average hops with {num_nodes} nodes is {avg_hops}")
+
+    assert avg_hops == 40
 
     # The number of hops to find a key using naive routing should be
     # proportional to the number of nodes in the network. Specifically
@@ -120,17 +128,37 @@ def main():
     # ----------------------------------------------------
     # Test finger table
     # ----------------------------------------------------
-    print("\nDisplaying nodes and sample finger table...")
+    print("\nBuild network...\n")
     nodes = build_nodes(10)
-    print("\nNodes in the network: ")
-    node_table = ["    Id: {0:>5}   Name: {1:<10}".format(node.get_id(), node.get_name()) for node in nodes]
-    print(*node_table, sep='\n')
+    node_table = [{"id": node.get_id(), "name": node.get_name()} for node in nodes]
+    pp.pprint({"network": node_table})
 
+    assert nodes[0].get_id() == 24 and nodes[0].get_name() == "node_3"
+    assert nodes[1].get_id() == 32 and nodes[1].get_name() == "node_2"
+    assert nodes[2].get_id() == 46 and nodes[2].get_name() == "node_6"
+    assert nodes[3].get_id() == 109 and nodes[3].get_name() == "node_4"
+    assert nodes[4].get_id() == 145 and nodes[4].get_name() == "node_8"
+    assert nodes[5].get_id() == 150 and nodes[5].get_name() == "node_7"
+    assert nodes[6].get_id() == 160 and nodes[6].get_name() == "node_0"
+    assert nodes[7].get_id() == 163 and nodes[7].get_name() == "node_1"
+    assert nodes[8].get_id() == 241 and nodes[8].get_name() == "node_9"
+    assert nodes[9].get_id() == 244 and nodes[9].get_name() == "node_5"
+
+    print("\nRetrieve finger table...\n")
     test_node = nodes[0]
-    print(f"\nFinger table for node \"{test_node.get_name()}\" with id {test_node.get_id()}: ")
-    finger_table = ["{0:>5} | {1:>5} | {2:<10}".format(i + 1, finger.get_id(), finger.get_name())
-                    for i, finger in enumerate(test_node.fingers)]
-    print(*finger_table, sep='\n')
+    fingers = test_node.fingers
+    finger_table = [{"position": i, "id": finger.get_id(), "name": finger.get_name()}
+                    for i, finger in enumerate(fingers)]
+    pp.pprint({"name": test_node.get_name(), "id": test_node.get_id(), "fingers": finger_table})
+
+    assert fingers[0].get_id() == 32 and fingers[0].get_name() == "node_2"
+    assert fingers[1].get_id() == 32 and fingers[1].get_name() == "node_2"
+    assert fingers[2].get_id() == 32 and fingers[2].get_name() == "node_2"
+    assert fingers[3].get_id() == 32 and fingers[3].get_name() == "node_2"
+    assert fingers[4].get_id() == 46 and fingers[4].get_name() == "node_6"
+    assert fingers[5].get_id() == 109 and fingers[5].get_name() == "node_4"
+    assert fingers[6].get_id() == 109 and fingers[6].get_name() == "node_4"
+    assert fingers[7].get_id() == 160 and fingers[7].get_name() == "node_0"
 
 
 if __name__ == "__main__":

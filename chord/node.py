@@ -11,61 +11,16 @@ from hash import hash_value, NUM_BITS
 
 class Node:
 
-    def __init__(self, name, id):
-        self.name = name
-        self.digest_id = id
+    def __init__(self, node_name, node_id):
+        self.name = node_name
+        self.digest_id = node_id
         self.successor = None
         self.fingers = []
 
     def get_name(self):
         return self.name
 
-    def successor(self):
-        return self.successor
-
-    def get_id(self):
-        return self.digest_id
-
-    def set_successor(self, successor):
-        self.successor = successor
-
-    def fix_fingers(self):
-        i = 0
-        next_key = (self.digest_id + pow(2, i)) % (pow(2, NUM_BITS) - 1)
-        while i < NUM_BITS:
-            next_finger = self.find_successor(next_key, 0)[0]
-            self.fingers.append(next_finger)
-
-            i += 1
-            next_key = (self.digest_id + pow(2, i)) % (pow(2, NUM_BITS) - 1)
-
-    def find_successor(self, digest, hops):
-        next_id = self.successor.get_id()
-        if next_id > self.digest_id:
-            if self.digest_id < digest <= next_id:
-                return self.successor, hops
-            else:
-                return self.successor.find_successor(digest, hops + 1)
-        else:
-            # Handle the case where this node has the highest digest
-            if digest > self.digest_id or digest <= next_id:
-                return self.successor, hops
-            else:
-                return self.successor.find_successor(digest, hops + 1)
-
-
-class ChordNode:
-
-    def __init__(self, name, id):
-        self.name = name
-        self.digest_id = id
-        self.successor = None
-        self.fingers = []
-
-    def get_name(self):
-        return self.name
-
-    def successor(self):
+    def get_successor(self):
         return self.successor
 
     def get_id(self):
@@ -85,6 +40,26 @@ class ChordNode:
 
             i += 1
             next_key = (self.digest_id + pow(2, i)) % (pow(2, NUM_BITS) - 1)
+
+    def find_successor(self, digest, hops):
+        next_id = self.successor.get_id()
+        if next_id > self.digest_id:
+            if self.digest_id < digest <= next_id:
+                return self.successor, hops
+            else:
+                return self.successor.find_successor(digest, hops + 1)
+        else:
+            # Handle the case where this node has the highest digest
+            if digest > self.digest_id or digest <= next_id:
+                return self.successor, hops
+            else:
+                return self.successor.find_successor(digest, hops + 1)
+
+
+class ChordNode(Node):
+
+    def __init__(self, node_name, node_id):
+        super().__init__(node_name, node_id)
 
     def find_successor(self, digest, hops):
         if digest == self.digest_id:

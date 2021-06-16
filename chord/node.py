@@ -55,6 +55,41 @@ class Node:
                 return self.successor.find_successor(digest, hops + 1)
 
 
+class ChordNode(Node):
+
+    def find_successor(self, digest, hops):
+        if digest == self.digest_id:
+            return self
+
+        next_id = self.successor.get_id()
+        if next_id > self.digest_id:
+            if self.digest_id < digest <= next_id:
+                return self.successor, hops
+            else:
+                next_node = self.closest_preceding_node(digest)
+                return next_node.find_successor(digest, hops + 1)
+        else:
+            # Handle the case where this node has the highest digest
+            if digest > self.digest_id or digest <= next_id:
+                return self.successor, hops
+            else:
+                next_node = self.closest_preceding_node(digest)
+                return next_node.find_successor(digest, hops + 1)
+
+    def closest_preceding_node(self, digest):
+        for i in range(start=NUM_BITS - 1, stop=0):
+            if self.digest_id < digest:
+                if self.digest_id < self.fingers[i].get_id() < digest:
+                    return self.fingers[i]
+            elif self.digest_id > digest:
+                if (self.digest_id < self.fingers[i].get_id()
+                        or self.fingers[i].get_id() < digest):
+                    return self.fingers[i]
+            else:
+                # We shouldn't get here but we could return predecessor here to be safe
+                pass
+
+
 def build_nodes(num_nodes):
     node_name_fmt = "node_{id}"
     node_ids = SortedDict()

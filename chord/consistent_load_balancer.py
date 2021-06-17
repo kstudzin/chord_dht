@@ -1,4 +1,7 @@
+import argparse
 import pprint
+from collections import defaultdict
+
 from sortedcontainers import SortedDict
 
 from util import generate_keys
@@ -9,6 +12,7 @@ pp = pprint.PrettyPrinter()
 
 server_name_fmt = "server_{id}"
 servers = SortedDict()
+max_server_id = 0
 
 
 def consistent_responsible_server(key):
@@ -33,10 +37,17 @@ def find_server(key_digest):
 
 
 def build_server_list(num_servers):
-    for i in range(num_servers):
+    global max_server_id
+
+    i = max_server_id
+    new_total = len(servers) + num_servers
+    while len(servers) < new_total:
         name = server_name_fmt.format(id=str(i))
         digest = hash_value(name)
         servers[digest] = Server(name)
+        i += 1
+
+    max_server_id = i
 
 
 def get_servers(keys):
@@ -49,38 +60,55 @@ def get_servers(keys):
     return result
 
 
+def calculate_change(servers_orig, servers_appended):
+    return [changed for changed in servers_orig if servers_orig[changed] != servers_appended[changed]]
+
+
+def config_parser():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('num_servers', type=int, help='number of servers to build')
+    parser.add_argument('num_keys', type=int, help='number of keys to build')
+    parser.add_argument('--additional', '-a', type=int, default=1,
+                        help='number of servers to add')
+    parser.add_argument('--no-formatting', action='store_const', const=print, default=pp.pprint,
+                        help='print raw data without formatting')
+
+    return parser
+
+
 def main():
-    # Initial 50 servers
-    num_servers = 50
-    num_keys = 10
+    parser = config_parser()
+    args = parser.parse_args()
+
+    num_servers = args.num_servers
+    num_keys = args.num_keys
+    additional = args.additional
+    printer = args.no_formatting
 
     build_server_list(num_servers)
+    orig_length = len(servers)
     keys = generate_keys(num_keys)
 
     result1 = get_servers(keys)
 
     # Add a server
-    name = server_name_fmt.format(id=num_servers)
-    digest = hash_value(name)
-    servers[digest] = Server(name)
+    build_server_list(additional)
 
     result2 = get_servers(keys)
 
     # Calculate the number of changes
-    changes = [changed for changed in result1 if result1[changed] != result2[changed]]
+    changes = calculate_change(result1, result2)
 
     # Print results
-    print(f"\nMapping of keys to server hosting key with {len(servers) - 1} servers:")
-    pp.pprint(result1)
+    print(f"\nMapping of keys to server hosting key with {orig_length} servers:")
+    printer(result1)
 
     print(f"\nMapping of keys to server hosting key with {len(servers)} servers:")
-    pp.pprint(result2)
+    printer(result2)
 
     print(f"\n A total of {len(changes)} out of {len(keys)} keys have changed hosts:")
-    pp.pprint(changes)
-
-    # Expect a total of nine keys to be assigned to a different server
-    assert len(changes) == 0
+    printer(changes)
 
 
 if __name__ == "__main__":

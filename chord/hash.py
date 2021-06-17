@@ -3,7 +3,7 @@
 Implemented using md5. All values are 1 byte, i.e., 0-255
 """
 import hashlib
-
+import sys
 
 NUM_BITS = 8
 
@@ -22,4 +22,5 @@ def hash_value(value):
 
 
 if __name__ == '__main__':
-    assert hash_value("Hello, world!") == 108
+    value = ' '.join(sys.argv[1:])
+    print(f"Value \"{value}\" has digest \"{hash_value(value)}\"")

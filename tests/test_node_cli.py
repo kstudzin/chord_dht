@@ -93,7 +93,7 @@ def test_naive_fingers():
     assert actual == expected
 
 
-def test_chord_network():
+def test_chord_fingers():
     cmd = ["python", "node.py", "10", "100", '--chord', '--action', 'fingers', '--no-formatting']
     expected = "Finger table for first node: \n" \
                "{'name': 'node_3', 'id': 24, 'fingers': [{'position': 0, 'id': 32, " \

@@ -117,11 +117,11 @@ python node.py 100 100 --naive --action hops
 #### Results
 
 ```
-Average hops with 50 nodes is 25.48
-Average hops with 100 nodes is 47.43
+Average hops with 50 nodes is 26.48
+Average hops with 100 nodes is 48.43
 ```
 
-The naive routing algorithm used here is _O(n)_ where _n_ is the number of nodes in the network. On average, we would expect to see _n/2_ hops. This aligns with what we see since _25.48 ~= 50/2_ and _47.43 ~= 100/2_.
+The naive routing algorithm used here is _O(n)_ where _n_ is the number of nodes in the network. On average, we would expect to see _n/2_ hops. This aligns with what we see since _26.48 ~= 50/2_ and _48.43 ~= 100/2_.
 
 ### Build Finger Tables
 

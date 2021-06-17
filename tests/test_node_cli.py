@@ -19,7 +19,7 @@ def run_cmd(cmd, expected):
 
 def test_100_naive_hops():
     cmd = ["python", "node.py", "100", "100", '--naive', '--action', 'hops']
-    expected = "Average hops with 100 nodes is 47.43"
+    expected = "Average hops with 100 nodes is 48.43"
 
     actual = run_cmd(cmd, expected)
     assert actual == expected
@@ -27,7 +27,7 @@ def test_100_naive_hops():
 
 def test_50_naive_hops():
     cmd = ["python", "node.py", "50", "100", '--naive', '--action', 'hops']
-    expected = "Average hops with 50 nodes is 25.48"
+    expected = "Average hops with 50 nodes is 26.48"
 
     actual = run_cmd(cmd, expected)
     assert actual == expected

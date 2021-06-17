@@ -5,27 +5,27 @@ from chord.util import generate_keys
 
 
 def test_naive_hops():
-    keys = generate_keys(100, key_prefix='cache_data')
+    keys = generate_keys(100, 'data')
 
-    nodes = build_nodes(50, Node)
+    nodes = build_nodes(50, Node, 'node')
     avg_hops = run_experiment(nodes, keys)
-    assert math.isclose(avg_hops, 25.28, abs_tol=0.01)
+    assert math.isclose(avg_hops, 26.48, abs_tol=0.01)
 
-    nodes = build_nodes(100, Node)
+    nodes = build_nodes(100, Node, 'node')
     avg_hops = run_experiment(nodes, keys)
-    assert math.isclose(avg_hops, 48.9, abs_tol=0.01)
+    assert math.isclose(avg_hops, 48.43, abs_tol=0.01)
 
 
 def test_chord_hops():
-    keys = generate_keys(100, key_prefix='cache_data')
+    keys = generate_keys(100, 'data')
 
-    nodes = build_nodes(50, ChordNode)
+    nodes = build_nodes(50, ChordNode, 'node')
     avg_hops = run_experiment(nodes, keys)
     assert math.isclose(avg_hops, 3.69, abs_tol=0.01)
 
-    nodes = build_nodes(100, ChordNode)
+    nodes = build_nodes(100, ChordNode, 'node')
     avg_hops = run_experiment(nodes, keys)
-    assert math.isclose(avg_hops, 3.97, abs_tol=0.01)
+    assert math.isclose(avg_hops, 4.12, abs_tol=0.01)
 
 
 def test_node_creation():

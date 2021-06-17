@@ -45,17 +45,10 @@ class Node:
 
     def find_successor(self, digest, hops):
         next_id = self.successor.get_id()
-        if next_id > self.digest_id:
-            if self.digest_id < digest <= next_id:
-                return self.successor, hops
-            else:
-                return self.successor.find_successor(digest, hops + 1)
+        if open_closed(self.digest_id, next_id, digest):
+            return self.successor, hops + 1
         else:
-            # Handle the case where this node has the highest digest
-            if digest > self.digest_id or digest <= next_id:
-                return self.successor, hops
-            else:
-                return self.successor.find_successor(digest, hops + 1)
+            return self.successor.find_successor(digest, hops + 1)
 
 
 class ChordNode(Node):
@@ -191,7 +184,7 @@ def main():
                      for node_type in [args.chord_nodes, args.naive_nodes, ChordNode]
                      if node_type is not None)
 
-    nodes = build_nodes(num_nodes, node_type, node_prefix)
+    nodes = build_nodes(num_nodes, node_type, node_name_prefix=node_prefix)
     keys = generate_keys(num_keys, key_prefix=key_prefix)
 
     if 'hops' in action:

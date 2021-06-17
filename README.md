@@ -2,6 +2,20 @@
 
 Chord DHT Implementation
 
+## Setup
+
+### Installation
+
+From the project root run the following commands:
+
+1. `source env.sh` 
+   _(Note: This will need to be run every time you open a new shell. To avoid re-running, add the contents to your shell profile.)_ 
+2. `pip install -r requirements.txt`
+
+### Testing
+
+Run tests using `pytest` from the project root or `tests` directories. All documentation of results from the assignment specification have test methods which can be run individually. The specific commands for each can be found in the Assignment Tasks section. Each `chord` submodule has unit tests and CLI tests which are in separate files for longer tests.
+
 ## Assignment Tasks
 
 | Task | File |
@@ -73,7 +87,7 @@ pytest tests/test_consistent_load_balancer.py
 pytest tests/test_consistent_load_balancer_cli.py -k test_50_orig_1_addtl
 
 # CLI
-python chord/consistent_load_balancer.py 50 10 --additional 1
+python consistent_load_balancer.py 50 10 --additional 1
 ```
 
 #### Results
@@ -226,6 +240,5 @@ Chord routing scales logarithmically with the number of nodes in the network. Gi
 - [ ] Search for node rather than iterate in `consistent_load_balancer`
 - [ ] Move `fix_fingers()` into `__init__()` or `set_successor()`
 - [ ] Add succeeding node list and use it to jump further if fingers not there
-- [ ] Instructions to set `PYTHONPATH` or Makefile + pipenv
 - [ ] Use data frames instead of pretty printing output
 - [ ] Load balancers share a lot of code and could be consolidated

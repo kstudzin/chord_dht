@@ -1,6 +1,7 @@
 import logging
 
-logging.basicConfig(filename='chord.log', encoding='utf-8', level=logging.WARN)
+logging.basicConfig(filename='chord.log', encoding='utf-8', level=logging.WARN,
+                    format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s')
 
 
 def generate_keys(num_keys, key_prefix="cached_data"):

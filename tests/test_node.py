@@ -64,6 +64,35 @@ def test_chord_node_creation():
     verify_successors(nodes)
 
 
+def test_all_fingers():
+    nodes = build_nodes(20, Node)
+    node_ids = [node.get_id() for node in nodes]
+
+    for node in nodes:
+        print(f"{node.get_id()}")
+        fingers = node.fingers
+
+        assert len(fingers) == 8
+        assert fingers[0].get_id() == get_id(0, node.get_id(), node_ids)
+        assert fingers[1].get_id() == get_id(1, node.get_id(), node_ids)
+        assert fingers[2].get_id() == get_id(2, node.get_id(), node_ids)
+        assert fingers[3].get_id() == get_id(3, node.get_id(), node_ids)
+        assert fingers[4].get_id() == get_id(4, node.get_id(), node_ids)
+        assert fingers[5].get_id() == get_id(5, node.get_id(), node_ids)
+        assert fingers[6].get_id() == get_id(6, node.get_id(), node_ids)
+        assert fingers[7].get_id() == get_id(7, node.get_id(), node_ids)
+
+
+def get_id(idx, node_id, ids):
+    search_id = (node_id + pow(2, idx)) % 255
+
+    for curr_id in ids:
+        if curr_id >= search_id:
+            return curr_id
+
+    return ids[0]
+
+
 def test_fingers_first_node():
     nodes = build_nodes(10, Node)
     fingers = nodes[0].fingers

@@ -75,13 +75,13 @@ def test_chord_network():
 
 def test_naive_fingers():
     cmd = ["python", "node.py", "10", "100", '--naive', '--action', 'fingers', '--no-formatting']
-    expected = "Finger table for first node: \n" \
+    expected = "Finger table for node \"node_3\": \n" \
                "{'name': 'node_3', 'id': 24, 'fingers': [{'position': 0, 'id': 32, " \
                "'name': 'node_2'}, {'position': 1, 'id': 32, 'name': 'node_2'}, {'position': 2, 'id': 32, " \
                "'name': 'node_2'}, {'position': 3, 'id': 32, 'name': 'node_2'}, {'position': 4, 'id': 46, " \
                "'name': 'node_6'}, {'position': 5, 'id': 109, 'name': 'node_4'}, {'position': 6, 'id': 109, " \
                "'name': 'node_4'}, {'position': 7, 'id': 160, 'name': 'node_0'}]}\n" \
-               "Finger table for last node: \n" \
+               "Finger table for node \"node_5\": \n" \
                "{" \
                "'name': 'node_5', 'id': 244, 'fingers': [{'position': 0, 'id': 24, 'name': 'node_3'}, {'position': 1, " \
                "'id': 24, 'name': 'node_3'}, {'position': 2, 'id': 24, 'name': 'node_3'}, {'position': 3, 'id': 24, " \
@@ -95,13 +95,13 @@ def test_naive_fingers():
 
 def test_chord_fingers():
     cmd = ["python", "node.py", "10", "100", '--chord', '--action', 'fingers', '--no-formatting']
-    expected = "Finger table for first node: \n" \
+    expected = "Finger table for node \"node_3\": \n" \
                "{'name': 'node_3', 'id': 24, 'fingers': [{'position': 0, 'id': 32, " \
                "'name': 'node_2'}, {'position': 1, 'id': 32, 'name': 'node_2'}, {'position': 2, 'id': 32, " \
                "'name': 'node_2'}, {'position': 3, 'id': 32, 'name': 'node_2'}, {'position': 4, 'id': 46, " \
                "'name': 'node_6'}, {'position': 5, 'id': 109, 'name': 'node_4'}, {'position': 6, 'id': 109, " \
                "'name': 'node_4'}, {'position': 7, 'id': 160, 'name': 'node_0'}]}\n" \
-               "Finger table for last node: \n" \
+               "Finger table for node \"node_5\": \n" \
                "{" \
                "'name': 'node_5', 'id': 244, 'fingers': [{'position': 0, 'id': 24, 'name': 'node_3'}, {'position': 1, " \
                "'id': 24, 'name': 'node_3'}, {'position': 2, 'id': 24, 'name': 'node_3'}, {'position': 3, 'id': 24, " \

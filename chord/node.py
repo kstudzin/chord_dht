@@ -30,28 +30,19 @@ class Node:
 
     def set_successor(self, successor):
         self.successor = successor
-        self.init_fingers(3)
 
-    def init_fingers(self, propagate):
-        # print(f"Propagate {propagate}")
-        # def fix_fingers(self):
-        self.fingers = []
-
+    def init_fingers(self):
         logging.info(f"Building finger table for {self.name} (Digest: {self.digest_id})")
+
         i = 0
         next_key = (self.digest_id + pow(2, i)) % (pow(2, NUM_BITS) - 1)
         while i < NUM_BITS:
             next_finger = self.find_successor(next_key, 0)[0]
-
             self.fingers.append(next_finger)
             logging.info(f"  Found finger {i} is successor({next_key}) = {next_finger.get_id()}")
 
             i += 1
             next_key = (self.digest_id + pow(2, i)) % (pow(2, NUM_BITS) - 1)
-
-        if propagate > 0:
-            for finger in self.fingers:
-                finger.init_fingers(propagate - 1)
 
     def find_successor(self, digest, hops):
         next_id = self.successor.get_id()
@@ -138,8 +129,8 @@ def build_nodes(num_nodes, node_type, node_name_prefix="node"):
     # next_node.set_successor(last_node)
     nodes.append(last_node)
 
-    # for node in nodes:
-    #     node.fix_fingers()
+    for node in nodes:
+        node.init_fingers()
 
     return nodes
 
@@ -223,7 +214,7 @@ def main():
         tables_list = nodes if 'all' in finger_tables else [nodes[0], nodes[-1]]
 
         for i, table in enumerate(tables_list):
-            print(f"Finger table for node {i}: ")
+            print(f"Finger table for node \"{table.get_name()}\": ")
             printer(finger_table(table))
 
 

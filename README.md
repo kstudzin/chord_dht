@@ -24,10 +24,10 @@ Run tests using `pytest` from the project root or `tests` directories. All docum
 | Hash function | `chord/hash.py` |
 | Mod-N load balancer | `chord/modn_load_balancer.py` |
 | Consistent load balancer | `chord/consistent_load_balancer.py` |
-| Naive routing | `chord/node.py` |
-| Build finger tables | `chord/node.py` |
-| Chord routing | `chord/node.py` |
-| Synchronization Protocol | `chord/node.py` |
+| Naive routing | Implementation: `chord/node.py` <br> Utilities/CLI: `chord/chord.py` |
+| Build finger tables | Implementation: `chord/node.py` <br> Utilities/CLI: `chord/chord.py` |
+| Chord routing | Implementation: `chord/node.py` <br> Utilities/CLI: `chord/chord.py` |
+| Synchronization Protocol | Implementation: `chord/node.py` <br> Utilities/CLI: `chord/chord.py` |
 
 ### Chord Worksheet
 
@@ -107,12 +107,12 @@ python consistent_load_balancer.py 50 10 --additional 1
  pytest tests/test_node.py -k test_naive_hops
  
 # CLI Tests
-pytest tests/test_node_cli.py -k test_100_naive_hops
-pytest tests/test_node_cli.py -k test_50_naive_hops
+pytest tests/test_chord_cli.py -k test_100_naive_hops
+pytest tests/test_chord_cli.py -k test_50_naive_hops
 
 # CLI
-python node.py 50 100 --naive --action hops
-python node.py 100 100 --naive --action hops
+python chord.py 50 100 --naive --action hops
+python chord.py 100 100 --naive --action hops
 ```
 
 #### Results
@@ -127,7 +127,7 @@ The naive routing algorithm used here is _O(n)_ where _n_ is the number of nodes
 ### Build Finger Tables
 
 **File:** `chord/node.py` <br>
-**Python structure:** `chord.node.Node.fingers` <br>
+**Python structure:** `chord.node.Node.fingers`, `chord.node.Node.init_fingers()` <br>
 
 #### Execution*
 
@@ -141,12 +141,12 @@ pytest tests/test_node.py -k test_node_creation
 pytest tests/test_node.py -k test_chord_node_creation
 
 # CLI Tests
-pytest tests/test_node_cli.py -k test_naive_network
-pytest tests/test_node_cli.py -k test_chord_network
+pytest tests/test_chord_cli.py -k test_naive_network
+pytest tests/test_chord_cli.py -k test_chord_network
 
 # CLI
-python node.py 10 100 --action network --naive
-python node.py 10 100 --action network 
+python chord.py 10 100 --action network --naive
+python chord.py 10 100 --action network 
 ```
 
 _**Fingers**_
@@ -160,12 +160,12 @@ pytest tests/test_node.py -k test_fingers_first_chord_node
 pytest tests/test_node.py -k test_fingers_last_chord_node
 
 # CLI Tests
-pytest tests/test_node_cli.py -k test_naive_fingers
-pytest tests/test_node_cli.py -k test_chord_fingers
+pytest tests/test_chord_cli.py -k test_naive_fingers
+pytest tests/test_chord_cli.py -k test_chord_fingers
  
 # CLI
-python node.py 10 100 --action fingers --naive
-python node.py 10 100 --action fingers
+python chord.py 10 100 --action fingers --naive
+python chord.py 10 100 --action fingers
 ```
 
 #### Results\*
@@ -220,12 +220,12 @@ Finger Table for Node: node_3 ID: 24
 pytest tests/test_node.py -k test_chord_hops
 
 # CLI Tests
-pytest tests/test_node_cli.py -k test_100_chord_hops
-pytest tests/test_node_cli.py -k test_50_chord_hops
+pytest tests/test_chord_cli.py -k test_100_chord_hops
+pytest tests/test_chord_cli.py -k test_50_chord_hops
 
 # CLI
-python node.py 50 100 --chord --action hops
-python node.py 100 100 --chord --action hops
+python chord.py 50 100 --chord --action hops
+python chord.py 100 100 --chord --action hops
 ```
 
 #### Results
@@ -249,10 +249,10 @@ Chord routing scales logarithmically with the number of nodes in the network. Gi
 pytest tests/test_node.py -k test_add_node
 
 ### CLI Tests
-pytest tests/test_node_cli.py -k test_node_joining
+pytest tests/test_chord_cli.py -k test_node_joining
 
 ### CLI
-python node.py 10 100 --chord --action join
+python chord.py 10 100 --chord --action join
 ```
 
 #### Results
@@ -265,5 +265,5 @@ The tests create a new node named `node_added_0` whose digest is `218`. The sync
 - [ ] Add succeeding node list and use it to jump further if fingers not there
 - [ ] Use data frames instead of pretty printing output
 - [ ] Load balancers share a lot of code and could be consolidated
-- [ ] Make `num_keys` optional in `node.py`
-- [ ] Use subparser instead of `--actions` in `node.py` 
+- [ ] Make `num_keys` optional in `chord.py`
+- [ ] Use subparser instead of `--actions` in `chord.py` 

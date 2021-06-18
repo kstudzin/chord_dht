@@ -1,18 +1,20 @@
 import math
 
+from chord import chord
+from chord.chord import run_experiment
 from chord.hash import hash_value
-from chord.node import run_experiment, Node, ChordNode, build_nodes
+from chord.node import Node, ChordNode
 from chord.util import generate_keys
 
 
 def test_naive_hops():
     keys = generate_keys(100, 'data')
 
-    nodes = build_nodes(50, Node, 'node').values()
+    nodes = chord.build_nodes(50, Node, 'node').values()
     avg_hops = run_experiment(nodes, keys)
     assert math.isclose(avg_hops, 26.48, abs_tol=0.01)
 
-    nodes = build_nodes(100, Node, 'node').values()
+    nodes = chord.build_nodes(100, Node, 'node').values()
     avg_hops = run_experiment(nodes, keys)
     assert math.isclose(avg_hops, 48.43, abs_tol=0.01)
 
@@ -20,17 +22,17 @@ def test_naive_hops():
 def test_chord_hops():
     keys = generate_keys(100, 'data')
 
-    nodes = build_nodes(50, ChordNode, 'node').values()
+    nodes = chord.build_nodes(50, ChordNode, 'node').values()
     avg_hops = run_experiment(nodes, keys)
     assert math.isclose(avg_hops, 3.69, abs_tol=0.01)
 
-    nodes = build_nodes(100, ChordNode, 'node').values()
+    nodes = chord.build_nodes(100, ChordNode, 'node').values()
     avg_hops = run_experiment(nodes, keys)
     assert math.isclose(avg_hops, 4.12, abs_tol=0.01)
 
 
 def test_node_creation():
-    nodes = build_nodes(10, Node).values()
+    nodes = chord.build_nodes(10, Node).values()
 
     assert len(nodes) == 10
     assert nodes[0].get_id() == 24 and nodes[0].get_name() == "node_3"
@@ -48,7 +50,7 @@ def test_node_creation():
 
 
 def test_chord_node_creation():
-    nodes = build_nodes(10, ChordNode).values()
+    nodes = chord.build_nodes(10, ChordNode).values()
 
     assert len(nodes) == 10
     assert nodes[0].get_id() == 24 and nodes[0].get_name() == "node_3"
@@ -66,12 +68,12 @@ def test_chord_node_creation():
 
 
 def test_20_fingers():
-    nodes = build_nodes(20, Node).values()
+    nodes = chord.build_nodes(20, Node).values()
     verify_fingers(nodes)
 
 
 def test_fingers_first_node():
-    nodes = build_nodes(10, Node).values()
+    nodes = chord.build_nodes(10, Node).values()
     fingers = nodes[0].fingers
 
     assert len(fingers) == 8
@@ -86,7 +88,7 @@ def test_fingers_first_node():
 
 
 def test_fingers_last_node():
-    nodes = build_nodes(10, Node).values()
+    nodes = chord.build_nodes(10, Node).values()
     fingers = nodes[-1].fingers
 
     assert len(fingers) == 8
@@ -101,7 +103,7 @@ def test_fingers_last_node():
 
 
 def test_fingers_first_chord_node():
-    nodes = build_nodes(10, ChordNode).values()
+    nodes = chord.build_nodes(10, ChordNode).values()
     fingers = nodes[0].fingers
 
     assert len(fingers) == 8
@@ -116,7 +118,7 @@ def test_fingers_first_chord_node():
 
 
 def test_fingers_last_chord_node():
-    nodes = build_nodes(10, ChordNode).values()
+    nodes = chord.build_nodes(10, ChordNode).values()
     fingers = nodes[-1].fingers
 
     assert len(fingers) == 8
@@ -131,7 +133,7 @@ def test_fingers_last_chord_node():
 
 
 def test_add_node():
-    nodes = build_nodes(10, ChordNode)
+    nodes = chord.build_nodes(10, ChordNode)
 
     new_name = 'node_added_0'
     new_digest = hash_value(new_name)

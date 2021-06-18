@@ -12,11 +12,11 @@ def test_naive_hops():
 
     nodes = chord.build_nodes(50, Node, 'node').values()
     avg_hops = run_experiment(nodes, keys)
-    assert math.isclose(avg_hops, 26.48, abs_tol=0.01)
+    assert math.isclose(avg_hops, 25.48, abs_tol=0.01)
 
     nodes = chord.build_nodes(100, Node, 'node').values()
     avg_hops = run_experiment(nodes, keys)
-    assert math.isclose(avg_hops, 48.43, abs_tol=0.01)
+    assert math.isclose(avg_hops, 47.43, abs_tol=0.01)
 
 
 def test_chord_hops():

@@ -38,11 +38,25 @@ class Node:
             next_key = (self.digest_id + pow(2, i)) % (pow(2, NUM_BITS) - 1)
 
     def find_successor(self, digest, hops):
+        if digest == self.digest_id:
+            return self, hops
+
         next_id = self.successor.get_id()
+
+        logging.debug(f"    Is id {digest} contained in ({self.digest_id}, {next_id}]?")
+
         if open_closed(self.digest_id, next_id, digest):
+
+            logging.debug(f"      Yes, returning successor {next_id} hops: {hops}")
             return self.successor, hops + 1
         else:
-            return self.successor.find_successor(digest, hops + 1)
+
+            logging.debug(f"      No, finding closest preceding node")
+            next_node = self.find_next_node(digest)
+            return next_node.find_successor(digest, hops + 1)
+
+    def find_next_node(self, digest):
+        return self.successor
 
     def join(self, known):
         self.successor = known.find_successor(self.get_id(), 0)[0]
@@ -68,20 +82,8 @@ class ChordNode(Node):
     def __init__(self, node_name, node_id):
         super().__init__(node_name, node_id)
 
-    def find_successor(self, digest, hops):
-        if digest == self.digest_id:
-            return self, hops
-
-        next_id = self.successor.get_id()
-
-        logging.debug(f"    Is id {digest} contained in ({self.digest_id}, {next_id}]?")
-        if open_closed(self.digest_id, next_id, digest):
-            logging.debug(f"      Yes, returning successor {next_id} hops: {hops}")
-            return self.successor, hops + 1
-        else:
-            logging.debug(f"      No, finding closest preceding node")
-            next_node = self.closest_preceding_node(digest)
-            return next_node.find_successor(digest, hops + 1)
+    def find_next_node(self, digest):
+        return self.closest_preceding_node(digest)
 
     def closest_preceding_node(self, digest):
 

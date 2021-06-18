@@ -27,6 +27,7 @@ Run tests using `pytest` from the project root or `tests` directories. All docum
 | Naive routing | `chord/node.py` |
 | Build finger tables | `chord/node.py` |
 | Chord routing | `chord/node.py` |
+| Synchronization Protocol | `chord/node.py` |
 
 ### Chord Worksheet
 
@@ -236,9 +237,33 @@ Average hops with 100 nodes is 4.12
 
 Chord routing scales logarithmically with the number of nodes in the network. Given that, we would expect average hops with 50 nodes to be close to _ln(50) = 3.9_ and average hops with 100 nodes to be close to _ln(100) = 4.6_. This is close to the results above. We expect to see logarithmic scaling because chord routing because it is essentially a binary search where at any point we can skip approximately half of the search space.
 
+### Synchronization Protocol
+
+**File:** `chord/node.py` <br>
+**Python structure:** `chord.node.Node.join()`, `chord.node.Node.stabilize()`, `chord.node.Node.fix_fingers()`, `chord.node.Node.notify()` <br>
+
+#### Execution
+
+```
+### Unit Tests
+pytest tests/test_node.py -k test_add_node
+
+### CLI Tests
+pytest tests/test_node_cli.py -k test_node_joining
+
+### CLI
+python node.py 10 100 --chord --action join
+```
+
+#### Results
+
+The tests create a new node named `node_added_0` whose digest is `218`. The synchronization methods correctly set the successor to node `241` and the predecessor `163`. Similarly, node `163` has updated its successor to point to new node `218`. This information is also reflected in properly updated finger tables.
+
 ## TODO
 - [ ] Search for node rather than iterate in `consistent_load_balancer`
 - [ ] Move `fix_fingers()` into `__init__()` or `set_successor()`
 - [ ] Add succeeding node list and use it to jump further if fingers not there
 - [ ] Use data frames instead of pretty printing output
 - [ ] Load balancers share a lot of code and could be consolidated
+- [ ] Make `num_keys` optional in `node.py`
+- [ ] Use subparser instead of `--actions` in `node.py` 

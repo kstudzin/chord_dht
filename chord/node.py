@@ -17,7 +17,8 @@ class Node:
         self.name = node_name
         self.digest_id = node_id
         self.successor = self
-        self.fingers = []
+        self.predecessor = None
+        self.fingers = [None] * NUM_BITS
 
     def get_name(self):
         return self.name
@@ -37,9 +38,8 @@ class Node:
         i = 0
         next_key = (self.digest_id + pow(2, i)) % (pow(2, NUM_BITS) - 1)
         while i < NUM_BITS:
-            next_finger = self.find_successor(next_key, 0)[0]
-            self.fingers.append(next_finger)
-            logging.info(f"  Found finger {i} is successor({next_key}) = {next_finger.get_id()}")
+            self.fingers[i] = self.find_successor(next_key, 0)[0]
+            logging.info(f"  Found finger {i} is successor({next_key}) = {self.fingers[i].get_id()}")
 
             i += 1
             next_key = (self.digest_id + pow(2, i)) % (pow(2, NUM_BITS) - 1)
@@ -50,6 +50,24 @@ class Node:
             return self.successor, hops + 1
         else:
             return self.successor.find_successor(digest, hops + 1)
+
+    def join(self, known):
+        self.successor = known.find_successor(self.get_id(), 0)[0]
+
+    def stabilize(self):
+        me = self.successor.predecessor
+        if me and open_open(self.digest_id, self.successor.digest_id, me.digest_id):
+            self.successor = me
+
+        self.successor.notify(self)
+
+    def notify(self, other):
+        if not self.predecessor \
+                or open_open(self.predecessor.digest_id, self.digest_id, other.digest_id):
+            self.predecessor = other
+
+    def fix_fingers(self):
+        self.init_fingers()
 
 
 class ChordNode(Node):
@@ -75,6 +93,8 @@ class ChordNode(Node):
     def closest_preceding_node(self, digest):
 
         for finger in reversed(self.fingers):
+            if not finger:
+                continue
 
             logging.debug(f"      Is {finger.get_id()} in ({self.digest_id, digest})?")
             if open_open(self.digest_id, digest, finger.get_id()):
@@ -87,52 +107,79 @@ class ChordNode(Node):
 
 def build_nodes(num_nodes, node_type, node_name_prefix="node"):
     node_name_fmt = "{prefix}_{id}"
-    node_ids = SortedDict()
+    nodes = SortedDict()
 
     # Node names may hash to the same value. Check that the actual number of
     # nodes we are looking for has been created before exiting
     i = 0
-    while len(node_ids) < num_nodes:
+    while len(nodes) < num_nodes:
         name = node_name_fmt.format(prefix=node_name_prefix, id=str(i))
         digest = hash_value(name)
-        node_ids[digest] = name
+        node = node_type(name, digest)
+        nodes[digest] = node
         i += 1
-
-    # List of nodes to return
-    nodes = []
 
     # Create the last node first and set it to prev_node so that successor
     # is set correctly
-    last_digest = node_ids.keys()[-1]
-    last_name = node_ids.values()[-1]
-    last_node = node_type(last_name, last_digest)
+    last_node = nodes.values()[-1]
     prev_node = last_node
 
     first_node = last_node
     # Iterate through sorted node ids to create nodes and set the successors
-    for node_id in node_ids.keys()[:-1]:
-        next_node = node_type(node_ids[node_id], node_id)
-        nodes.append(next_node)
-        logging.debug(node_table(nodes))
-
+    for next_node in nodes.values()[:-1]:
         # New node always points to the first node added
         next_node.set_successor(first_node)
-        logging.info(finger_table(next_node))
 
         # Update the previous node to point to the new node
         prev_node.set_successor(next_node)
-        logging.debug(finger_table(prev_node))
 
         # Set new prev node for next iteration
         prev_node = next_node
 
-    # next_node.set_successor(last_node)
-    nodes.append(last_node)
-
-    for node in nodes:
+    for node in nodes.values():
         node.init_fingers()
+        node.stabilize()
 
     return nodes
+
+
+def add_nodes(nodes_map, num_new, node_type):
+    name_format = 'node_added_{id}'
+    hashes = nodes_map.keys()
+    nodes = nodes_map.values()
+
+    i = 0
+    new_nodes = []
+    prev_nodes = []
+    while len(new_nodes) < num_new:
+        # Create the node
+        new_name = name_format.format(id=str(i))
+        new_digest = hash_value(new_name)
+        new_node = node_type(new_name, new_digest)
+        new_nodes.append(new_node)
+        nodes_map[new_digest] = new_node
+
+        # Join the network
+        new_node.join(nodes[0])
+        new_node.stabilize()
+
+        # Find previous node to stabilize
+        prev_digest = next(prev_digest
+                           for prev_digest in reversed(hashes)
+                           if prev_digest < new_digest)
+        prev_node = nodes_map[prev_digest]
+        prev_node.stabilize()
+        prev_nodes.append(prev_node)
+
+    for node in nodes:
+        node.fix_fingers()
+
+    return new_nodes, prev_nodes
+
+
+def update_existing(nodes, new_hashes):
+    for node in nodes.values():
+        node.fix_fingers()
 
 
 def run_experiment(nodes, keys):
@@ -159,25 +206,41 @@ def finger_table(node):
     return {"name": node.get_name(), "id": node.get_id(), "fingers": table}
 
 
+def finger_table_links(node):
+    table = finger_table(node)
+    table['successor'] = node.get_successor().get_id()
+    table['predecessor'] = node.predecessor.get_id()
+
+    return table
+
+
 def config_parser():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('num_nodes', type=int, help='number of nodes to use for tests')
     parser.add_argument('num_keys', type=int, help='number of keys to run tests on')
-    parser.add_argument('--naive-nodes', action='store_const', const=Node,
-                        help='Build naive nodes')
-    parser.add_argument('--chord-nodes', action='store_const', const=ChordNode,
-                        help='Build chord nodes')
     parser.add_argument('--key-prefix', '-k', type=str, default='data',
                         help='prefix of key name')
     parser.add_argument('--node_prefix', '-n', type=str, default='node',
                         help='prefix of node name')
-    parser.add_argument('--action', '-a', choices=['hops', 'network', 'fingers'], nargs='+', default='hops',
-                        help='')
-    parser.add_argument('--finger-tables', '-f', choices=['all', 'sample'], nargs='+', default=['sample'],
-                        help='which finger tables to print')
+    parser.add_argument('--action', '-a', choices=['hops', 'network', 'fingers', 'join'], nargs='+', default='hops',
+                        help='actions to perform. \'hops\' calculates the average hops to find keys in the network. '
+                             '\'network\' creates a network and outputs summary. \'fingers\' creates a network and '
+                             'outputs finger tables. \'join\' creates a network, adds a new node, and runs '
+                             'synchronization protocol methods')
+    parser.add_argument('--finger-tables', '-f', choices=['all', 'sample'], nargs=1, default=['sample'],
+                        help='determines which finger tables to print if \'fingers\' is an action')
+    parser.add_argument('--joining', '-j', type=int, default=1, metavar='NUM_JOINING',
+                        help='number of servers to join original network if \'join\' is an action')
     parser.add_argument('--no-formatting', action='store_const', const=print, default=pp.pprint,
                         help='print raw data without formatting')
+
+    node_type_group = parser.add_mutually_exclusive_group()
+    node_type_group.add_argument('--naive-nodes', action='store_const', const=Node,
+                                 help='Build naive nodes. Only useful with \'hops\' action. Cannot be used with '
+                                      'another node type')
+    node_type_group.add_argument('--chord-nodes', action='store_const', const=ChordNode,
+                                 help='Build chord nodes. Cannot be used with another node type')
 
     return parser
 
@@ -192,6 +255,7 @@ def main():
     node_prefix = args.node_prefix
     action = args.action
     finger_tables = args.finger_tables
+    num_joining = args.joining
     printer = args.no_formatting
 
     # Retrieve first non None value
@@ -199,9 +263,13 @@ def main():
                      for node_type in [args.chord_nodes, args.naive_nodes, ChordNode]
                      if node_type is not None)
 
-    nodes = build_nodes(num_nodes, node_type, node_name_prefix=node_prefix)
+    # Create data
+    nodes_map = build_nodes(num_nodes, node_type, node_name_prefix=node_prefix)
+    hashes = list(nodes_map.keys())
+    nodes = nodes_map.values()
     keys = generate_keys(num_keys, key_prefix=key_prefix)
 
+    # Perform actions
     if 'hops' in action:
         avg_hops = run_experiment(nodes, keys)
         print(f"Average hops with {len(nodes)} nodes is {avg_hops}")
@@ -211,11 +279,23 @@ def main():
         printer(node_table(nodes))
 
     if 'fingers' in action:
-        tables_list = nodes if 'all' in finger_tables else [nodes[0], nodes[-1]]
+        tables_list = nodes if 'all' == finger_tables else [nodes[0], nodes[-1]]
 
         for i, table in enumerate(tables_list):
             print(f"Finger table for node \"{table.get_name()}\": ")
             printer(finger_table(table))
+
+    if 'join' in action:
+        print(f'Original node ids: {hashes}')
+        new, updated = add_nodes(nodes_map, num_joining, node_type)
+
+        print(f"\nFinger table(s) for new nodes:")
+        for new_node in new:
+            printer(finger_table_links(new_node))
+
+        print(f'\nFinger table(s) for key updated nodes:')
+        for updated_node in updated:
+            printer(finger_table_links(updated_node))
 
 
 if __name__ == "__main__":

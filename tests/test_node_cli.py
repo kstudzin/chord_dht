@@ -111,3 +111,22 @@ def test_chord_fingers():
 
     actual = run_cmd(cmd, expected)
     assert actual == expected
+
+
+def test_node_joining():
+    cmd = ['python', 'node.py', '10', '100', '--chord', '--action', 'join', '--no-formatting']
+    expected = "Original node ids: [24, 32, 46, 109, 145, 150, 160, 163, 241, 244]\n\nFinger table(s) for new " \
+               "nodes:\n{'name': 'node_added_0', 'id': 218, 'fingers': [{'position': 0, 'id': 241, 'name': 'node_9'}, " \
+               "{'position': 1, 'id': 241, 'name': 'node_9'}, {'position': 2, 'id': 241, 'name': 'node_9'}, " \
+               "{'position': 3, 'id': 241, 'name': 'node_9'}, {'position': 4, 'id': 241, 'name': 'node_9'}, " \
+               "{'position': 5, 'id': 24, 'name': 'node_3'}, {'position': 6, 'id': 32, 'name': 'node_2'}, " \
+               "{'position': 7, 'id': 109, 'name': 'node_4'}], 'successor': 241, 'predecessor': 163}\n\nFinger table(" \
+               "s) for key updated nodes:\n{'name': 'node_1', 'id': 163, 'fingers': [{'position': 0, 'id': 218, " \
+               "'name': 'node_added_0'}, {'position': 1, 'id': 218, 'name': 'node_added_0'}, {'position': 2, " \
+               "'id': 218, 'name': 'node_added_0'}, {'position': 3, 'id': 218, 'name': 'node_added_0'}, {'position': " \
+               "4, 'id': 218, 'name': 'node_added_0'}, {'position': 5, 'id': 218, 'name': 'node_added_0'}, " \
+               "{'position': 6, 'id': 241, 'name': 'node_9'}, {'position': 7, 'id': 46, 'name': 'node_6'}], " \
+               "'successor': 218, 'predecessor': 160}"
+
+    actual = run_cmd(cmd, expected)
+    assert actual == expected

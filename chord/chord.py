@@ -104,14 +104,14 @@ def node_table(nodes):
 def finger_table(node):
     fingers = node.fingers
     table = [{"position": i, "id": finger.get_id(), "name": finger.get_name()}
-             for i, finger in enumerate(fingers)]
+             for i, finger in enumerate(fingers) if finger is not None]
     return {"name": node.get_name(), "id": node.get_id(), "fingers": table}
 
 
 def finger_table_links(node):
     table = finger_table(node)
-    table['successor'] = node.get_successor().get_id()
-    table['predecessor'] = node.predecessor.get_id()
+    table['successor'] = node.successor
+    table['predecessor'] = node.predecessor
 
     return table
 

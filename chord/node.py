@@ -109,6 +109,11 @@ class Node:
             self.predecessor = other
             self.predecessor_address = other_address
 
+            # Set successor if there are only 2 nodes in the system
+            if open_open(self.digest_id, self.successor, self.predecessor):
+                self.successor = self.predecessor
+                self.successor_address = self.predecessor_address
+
     def fix_fingers(self):
         self.init_fingers()
 

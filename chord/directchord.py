@@ -1,3 +1,8 @@
+''' Non-networked Chord nodes
+
+This file contains the code for chord nodes before adding ZMQ.
+
+'''
 import argparse
 import pprint
 import statistics

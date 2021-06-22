@@ -13,31 +13,47 @@ from hash import NUM_BITS, hash_value
 
 class Node:
 
-    def __init__(self, node_name, node_id, address1, address2):
+    def __init__(self, node_name, node_id, address, external_port=None, internal_port=None):
+        endpoint_fmt = '{0}:{1}'
+
+        # Node identification
         self.name = node_name
         self.digest_id = node_id
-        self.internal_endpoint = address2
 
+        # ZMQ sockets
+        self.context = zmq.Context()
+        self.router = self.context.socket(zmq.ROUTER)
+
+        if external_port:
+            self.external_endpoint = endpoint_fmt.format(address, external_port)
+            self.router.bind(self.external_endpoint)
+        else:
+            port = self.router.bind_to_random_port(address)
+            self.external_endpoint = endpoint_fmt.format(address, port)
+
+        identity = struct.pack('i', self.digest_id)
+        self.receiver = self.context.socket(zmq.DEALER)
+        self.receiver.setsockopt(zmq.IDENTITY, identity)
+
+        if internal_port:
+            self.internal_endpoint = endpoint_fmt.format(address, internal_port)
+            self.receiver.bind(self.internal_endpoint)
+        else:
+            port = self.receiver.bind_to_random_port(address)
+            self.internal_endpoint = endpoint_fmt.format(address, port)
+
+        self.stabilize_address = f'inproc://stabilize_{self.digest_id}'
+        self.fix_fingers_address = f'inproc://fix_fingers_{self.digest_id}'
+
+        self.connected = set()
+
+        # Pointers to network nodes
         self.successor = self.digest_id
         self.successor_address = self.internal_endpoint
         self.predecessor = None
         self.predecessor_address = None
         self.fingers = [None] * NUM_BITS
         self.finger_addresses = [None] * NUM_BITS
-
-        self.context = zmq.Context()
-        self.router = self.context.socket(zmq.ROUTER)
-        self.router.bind(address1)
-
-        identity = struct.pack('i', self.digest_id)
-        self.receiver = self.context.socket(zmq.DEALER)
-        self.receiver.setsockopt(zmq.IDENTITY, identity)
-        self.receiver.bind(self.internal_endpoint)
-
-        self.stabilize_address = f'inproc://stabilize_{self.digest_id}'
-        self.fix_fingers_address = f'inproc://fix_fingers_{self.digest_id}'
-
-        self.connected = set()
 
     def get_name(self):
         return self.name
@@ -363,12 +379,12 @@ def main():
     print('Creating node 1')
     name1 = 'node_0'
     digest1 = hash_value(name1)
-    node1 = Node(name1, digest1, 'tcp://127.0.0.1:5500', 'tcp://127.0.0.1:5501')
+    node1 = Node(name1, digest1, 'tcp://127.0.0.1', '5500', '5501')
 
     print('Creating node 2')
     name2 = 'node_1'
     digest2 = hash_value(name2)
-    node2 = Node(name2, digest2, 'tcp://127.0.0.1:5502', 'tcp://127.0.0.1:5503')
+    node2 = Node(name2, digest2, 'tcp://127.0.0.1', '5502', '5503')
 
     print('Staring node 1')
     node1_t = threading.Thread(target=node1.run, daemon=True)

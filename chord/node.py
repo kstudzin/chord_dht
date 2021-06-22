@@ -1,4 +1,5 @@
 import logging
+import pprint
 import struct
 import threading
 import time
@@ -34,6 +35,7 @@ class Node:
         self.receiver.bind(self.internal_endpoint)
 
         self.stabilize_address = f'inproc://stabilize_{self.digest_id}'
+        self.fix_fingers_address = f'inproc://fix_fingers_{self.digest_id}'
 
         self.connected = set()
 
@@ -49,17 +51,34 @@ class Node:
     def set_successor(self, successor):
         self.successor = successor
 
-    def init_fingers(self):
+    def _init_fingers(self, pair):
         logging.info(f"Building finger table for {self.name} (Digest: {self.digest_id})")
 
         i = 0
         next_key = (self.digest_id + pow(2, i)) % (pow(2, NUM_BITS) - 1)
         while i < NUM_BITS:
-            self.fingers[i] = self.find_successor(next_key, 0)[0]
-            logging.info(f"  Found finger {i} is successor({next_key}) = {self.fingers[i].get_id()}")
+            finger, finger_address = self._find_successor(pair, next_key)
+            self.fingers[i] = finger
+            self.finger_addresses[i] = finger_address
+            logging.info(f"  Found finger {i} is successor({next_key}) = {self.fingers[i]}")
 
             i += 1
             next_key = (self.digest_id + pow(2, i)) % (pow(2, NUM_BITS) - 1)
+
+    def _find_successor(self, pair, digest):
+        cmd = FindSuccessorCommand()
+        cmd.return_id = self.digest_id
+        cmd.return_address = self.internal_endpoint
+        cmd.return_type = FindSuccessorCommand.RETURN_TYPE_NODE
+        cmd.digest = digest
+
+        pair.send(Command.FIND_SUCCESSOR, zmq.SNDMORE)
+        pair.send_json(vars(cmd))
+
+        recv_cmd = pair.recv()
+        found = pair.recv_json()
+        found_cmd = FindSuccessorCommand.parse(found)
+        return found_cmd.successor, found_cmd.address
 
     def find_successor(self, digest, hops):
         if digest == self.digest_id:
@@ -114,8 +133,13 @@ class Node:
                 self.successor = self.predecessor
                 self.successor_address = self.predecessor_address
 
-    def fix_fingers(self):
-        self.init_fingers()
+    def fix_fingers(self, context):
+        pair = context.socket(zmq.PAIR)
+        pair.connect(self.fix_fingers_address)
+
+        while True:
+            time.sleep(5)
+            self._init_fingers(pair)
 
     def stabilize_loop(self, context: zmq.Context):
         pair = context.socket(zmq.PAIR)
@@ -160,9 +184,13 @@ class Node:
         stability = self.context.socket(zmq.PAIR)
         stability.bind(self.stabilize_address)
 
+        fix_fingers = self.context.socket(zmq.PAIR)
+        fix_fingers.bind(self.fix_fingers_address)
+
         poller = zmq.Poller()
         poller.register(self.receiver, zmq.POLLIN)
         poller.register(stability, zmq.POLLIN)
+        poller.register(fix_fingers, zmq.POLLIN)
 
         while True:
 
@@ -188,11 +216,14 @@ class Node:
                     if address == self.stabilize_address and not identity:
                         stability.send(next_cmd, zmq.SNDMORE)
                         stability.send_json(parameters)
+                    elif address == self.fix_fingers_address and not identity:
+                        fix_fingers.send(next_cmd, zmq.SNDMORE)
+                        fix_fingers.send_json(parameters)
                     else:
                         self.route_result(address, identity, next_cmd, parameters)
 
     def route_result(self, address, identity, next_cmd, parameters):
-        logging.info(f'Node {self.digest_id} sending {next_cmd} with {parameters} to node {identity}')
+        logging.info(f'Node {self.digest_id} sending {next_cmd} with {parameters} to node {identity} at {address}')
         if address not in self.connected:
             self.connected.add(address)
             self.router.connect(address)
@@ -306,10 +337,9 @@ class FindSuccessorCommand(Command):
     def execute(self, node):
         if self.found:
             if self.return_type == self.RETURN_TYPE_NODE:
-                node.fingers[self.return_data] = self.successor
-                node.finger_addresses[self.return_data] = self.address
                 node.router.connect(self.address)
                 node.connected.add(self.address)
+                return node.fix_fingers_address, None, Command.FIND_SUCCESSOR, vars(self)
             elif self.return_type == self.RETURN_TYPE_CLIENT:
                 pass
         else:
@@ -378,6 +408,20 @@ def main():
     print('Result:')
     print(chord.finger_table_links(node1))
     print(chord.finger_table_links(node2))
+
+    print('Fixing fingers')
+    fix_pair1 = node1.context.socket(zmq.PAIR)
+    fix_pair1.connect(node1.fix_fingers_address)
+    node1._init_fingers(fix_pair1)
+
+    fix_pair2 = node2.context.socket(zmq.PAIR)
+    fix_pair2.connect(node2.fix_fingers_address)
+    node2._init_fingers(fix_pair2)
+
+    print('Result:')
+    pp = pprint.PrettyPrinter()
+    pp.pprint(chord.finger_table_links(node1))
+    pp.pprint(chord.finger_table_links(node2))
 
 
 if __name__ == '__main__':

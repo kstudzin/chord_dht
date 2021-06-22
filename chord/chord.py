@@ -103,8 +103,9 @@ def node_table(nodes):
 
 def finger_table(node):
     fingers = node.fingers
-    table = [{"position": i, "id": finger.get_id(), "name": finger.get_name()}
-             for i, finger in enumerate(fingers) if finger is not None]
+    addresses = node.finger_addresses
+    table = [{"position": i, "id": finger, "name": address}
+             for i, (finger, address) in enumerate(zip(fingers, addresses)) if finger and address]
     return {"name": node.get_name(), "id": node.get_id(), "fingers": table}
 
 

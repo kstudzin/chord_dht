@@ -18,7 +18,7 @@ def run_cmd(cmd, expected):
 
 
 def test_100_naive_hops():
-    cmd = ["python", "chord.py", "100", "100", '--naive', '--action', 'hops']
+    cmd = ["python", "directchord.py", "100", "100", '--naive', '--action', 'hops']
     expected = "Average hops with 100 nodes is 47.43"
 
     actual = run_cmd(cmd, expected)
@@ -26,7 +26,7 @@ def test_100_naive_hops():
 
 
 def test_50_naive_hops():
-    cmd = ["python", "chord.py", "50", "100", '--naive', '--action', 'hops']
+    cmd = ["python", "directchord.py", "50", "100", '--naive', '--action', 'hops']
     expected = "Average hops with 50 nodes is 25.48"
 
     actual = run_cmd(cmd, expected)
@@ -34,7 +34,7 @@ def test_50_naive_hops():
 
 
 def test_100_chord_hops():
-    cmd = ["python", "chord.py", "100", "100", '--chord', '--action', 'hops']
+    cmd = ["python", "directchord.py", "100", "100", '--chord', '--action', 'hops']
     expected = "Average hops with 100 nodes is 4.12"
 
     actual = run_cmd(cmd, expected)
@@ -42,7 +42,7 @@ def test_100_chord_hops():
 
 
 def test_50_chord_hops():
-    cmd = ["python", "chord.py", "50", "100", '--chord', '--action', 'hops']
+    cmd = ["python", "directchord.py", "50", "100", '--chord', '--action', 'hops']
     expected = "Average hops with 50 nodes is 3.69"
 
     actual = run_cmd(cmd, expected)
@@ -50,7 +50,7 @@ def test_50_chord_hops():
 
 
 def test_naive_network():
-    cmd = ["python", "chord.py", "10", "100", '--naive', '--action', 'network', '--no-formatting']
+    cmd = ["python", "directchord.py", "10", "100", '--naive', '--action', 'network', '--no-formatting']
     expected = "Nodes in the network: \n" \
                "{'network': [{'id': 24, 'name': 'node_3'}, {'id': 32, 'name': 'node_2'}, " \
                "{'id': 46, 'name': 'node_6'}, {'id': 109, 'name': 'node_4'}, {'id': 145, 'name': 'node_8'}, " \
@@ -62,7 +62,7 @@ def test_naive_network():
 
 
 def test_chord_network():
-    cmd = ["python", "chord.py", "10", "100", '--chord', '--action', 'network', '--no-formatting']
+    cmd = ["python", "directchord.py", "10", "100", '--chord', '--action', 'network', '--no-formatting']
     expected = "Nodes in the network: \n" \
                "{'network': [{'id': 24, 'name': 'node_3'}, {'id': 32, 'name': 'node_2'}, " \
                "{'id': 46, 'name': 'node_6'}, {'id': 109, 'name': 'node_4'}, {'id': 145, 'name': 'node_8'}, " \
@@ -74,7 +74,7 @@ def test_chord_network():
 
 
 def test_naive_fingers():
-    cmd = ["python", "chord.py", "10", "100", '--naive', '--action', 'fingers', '--no-formatting']
+    cmd = ["python", "directchord.py", "10", "100", '--naive', '--action', 'fingers', '--no-formatting']
     expected = "Finger table for node \"node_3\": \n" \
                "{'name': 'node_3', 'id': 24, 'fingers': [{'position': 0, 'id': 32, " \
                "'name': 'node_2'}, {'position': 1, 'id': 32, 'name': 'node_2'}, {'position': 2, 'id': 32, " \
@@ -94,7 +94,7 @@ def test_naive_fingers():
 
 
 def test_chord_fingers():
-    cmd = ["python", "chord.py", "10", "100", '--chord', '--action', 'fingers', '--no-formatting']
+    cmd = ["python", "directchord.py", "10", "100", '--chord', '--action', 'fingers', '--no-formatting']
     expected = "Finger table for node \"node_3\": \n" \
                "{'name': 'node_3', 'id': 24, 'fingers': [{'position': 0, 'id': 32, " \
                "'name': 'node_2'}, {'position': 1, 'id': 32, 'name': 'node_2'}, {'position': 2, 'id': 32, " \
@@ -114,7 +114,7 @@ def test_chord_fingers():
 
 
 def test_node_joining():
-    cmd = ['python', 'chord.py', '10', '100', '--chord', '--action', 'join', '--no-formatting']
+    cmd = ['python', 'directchord.py', '10', '100', '--chord', '--action', 'join', '--no-formatting']
     expected = "Original node ids: [24, 32, 46, 109, 145, 150, 160, 163, 241, 244]\n\nFinger table(s) for new " \
                "nodes:\n{'name': 'node_added_0', 'id': 218, 'fingers': [{'position': 0, 'id': 241, 'name': 'node_9'}, " \
                "{'position': 1, 'id': 241, 'name': 'node_9'}, {'position': 2, 'id': 241, 'name': 'node_9'}, " \

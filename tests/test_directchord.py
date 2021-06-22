@@ -1,20 +1,19 @@
 import math
 
-from chord import chord
-from chord.chord import run_experiment
+from chord import directchord
+from chord.directchord import run_experiment, DirectNode, DirectChordNode
 from chord.hash import hash_value
-from chord.node import Node, ChordNode
 from chord.util import generate_keys
 
 
 def test_naive_hops():
     keys = generate_keys(100, 'data')
 
-    nodes = chord.build_nodes(50, Node, 'node').values()
+    nodes = directchord.build_nodes(50, DirectNode, 'node').values()
     avg_hops = run_experiment(nodes, keys)
     assert math.isclose(avg_hops, 25.48, abs_tol=0.01)
 
-    nodes = chord.build_nodes(100, Node, 'node').values()
+    nodes = directchord.build_nodes(100, DirectNode, 'node').values()
     avg_hops = run_experiment(nodes, keys)
     assert math.isclose(avg_hops, 47.43, abs_tol=0.01)
 
@@ -22,17 +21,17 @@ def test_naive_hops():
 def test_chord_hops():
     keys = generate_keys(100, 'data')
 
-    nodes = chord.build_nodes(50, ChordNode, 'node').values()
+    nodes = directchord.build_nodes(50, DirectChordNode, 'node').values()
     avg_hops = run_experiment(nodes, keys)
     assert math.isclose(avg_hops, 3.69, abs_tol=0.01)
 
-    nodes = chord.build_nodes(100, ChordNode, 'node').values()
+    nodes = directchord.build_nodes(100, DirectChordNode, 'node').values()
     avg_hops = run_experiment(nodes, keys)
     assert math.isclose(avg_hops, 4.12, abs_tol=0.01)
 
 
 def test_node_creation():
-    nodes = chord.build_nodes(10, Node).values()
+    nodes = directchord.build_nodes(10, DirectNode).values()
 
     assert len(nodes) == 10
     assert nodes[0].get_id() == 24 and nodes[0].get_name() == "node_3"
@@ -50,7 +49,7 @@ def test_node_creation():
 
 
 def test_chord_node_creation():
-    nodes = chord.build_nodes(10, ChordNode).values()
+    nodes = directchord.build_nodes(10, DirectChordNode).values()
 
     assert len(nodes) == 10
     assert nodes[0].get_id() == 24 and nodes[0].get_name() == "node_3"
@@ -68,12 +67,12 @@ def test_chord_node_creation():
 
 
 def test_20_fingers():
-    nodes = chord.build_nodes(20, Node).values()
+    nodes = directchord.build_nodes(20, DirectNode).values()
     verify_fingers(nodes)
 
 
 def test_fingers_first_node():
-    nodes = chord.build_nodes(10, Node).values()
+    nodes = directchord.build_nodes(10, DirectNode).values()
     fingers = nodes[0].fingers
 
     assert len(fingers) == 8
@@ -88,7 +87,7 @@ def test_fingers_first_node():
 
 
 def test_fingers_last_node():
-    nodes = chord.build_nodes(10, Node).values()
+    nodes = directchord.build_nodes(10, DirectNode).values()
     fingers = nodes[-1].fingers
 
     assert len(fingers) == 8
@@ -103,7 +102,7 @@ def test_fingers_last_node():
 
 
 def test_fingers_first_chord_node():
-    nodes = chord.build_nodes(10, ChordNode).values()
+    nodes = directchord.build_nodes(10, DirectChordNode).values()
     fingers = nodes[0].fingers
 
     assert len(fingers) == 8
@@ -118,7 +117,7 @@ def test_fingers_first_chord_node():
 
 
 def test_fingers_last_chord_node():
-    nodes = chord.build_nodes(10, ChordNode).values()
+    nodes = directchord.build_nodes(10, DirectChordNode).values()
     fingers = nodes[-1].fingers
 
     assert len(fingers) == 8
@@ -133,13 +132,13 @@ def test_fingers_last_chord_node():
 
 
 def test_add_node():
-    nodes = chord.build_nodes(10, ChordNode)
+    nodes = directchord.build_nodes(10, DirectChordNode)
 
     new_name = 'node_added_0'
     new_digest = hash_value(new_name)
     assert new_digest == 218
 
-    new_node = Node(new_name, new_digest)
+    new_node = DirectChordNode(new_name, new_digest)
     new_node.join(nodes.values()[0])
     assert new_node.get_successor().get_id() == 241
 

@@ -10,6 +10,10 @@ import chord
 from util import open_closed, open_open
 from hash import NUM_BITS, hash_value
 
+# -----------------------------------------------------------------------------
+# Networked Chord Implementation
+# -----------------------------------------------------------------------------
+
 
 class Node:
 
@@ -374,6 +378,25 @@ parsers = {Command.FIND_SUCCESSOR: FindSuccessorCommand.parse,
            Command.GET_SUCCESSOR_PREDECESSOR: PredecessorCommand.parse,
            Command.NOTIFY: NotifyCommand.parse}
 
+
+# -----------------------------------------------------------------------------
+# CLI Helpers
+# -----------------------------------------------------------------------------
+
+def finger_table(node):
+    fingers = node.fingers
+    addresses = node.finger_addresses
+    table = [{"position": i, "id": finger, "name": address}
+             for i, (finger, address) in enumerate(zip(fingers, addresses)) if finger and address]
+    return {"name": node.get_name(), "id": node.get_id(), "fingers": table}
+
+
+def finger_table_links(node):
+    table = finger_table(node)
+    table['successor'] = node.successor
+    table['predecessor'] = node.predecessor
+
+    return table
 
 def main():
     print('Creating node 1')

@@ -63,7 +63,7 @@ class Node:
 
     def find_successor(self, digest, hops):
         if digest == self.digest_id:
-            return self, hops
+            return True, self.digest_id, self.internal_endpoint, hops
 
         next_id = self.successor
 

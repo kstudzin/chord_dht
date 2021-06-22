@@ -20,6 +20,7 @@ class Node:
         self.successor = self.digest_id
         self.successor_address = self.internal_endpoint
         self.predecessor = None
+        self.predecessor_address = None
         self.fingers = [None] * NUM_BITS
         self.finger_addresses = [None] * NUM_BITS
 
@@ -31,6 +32,8 @@ class Node:
         self.receiver = self.context.socket(zmq.DEALER)
         self.receiver.setsockopt(zmq.IDENTITY, identity)
         self.receiver.bind(self.internal_endpoint)
+
+        self.stabilize_address = f'inproc://stabilize_{self.digest_id}'
 
         self.connected = set()
 
@@ -96,42 +99,95 @@ class Node:
         found_successor = FindSuccessorCommand.parse(result)
         self.successor = found_successor.successor
         self.successor_address = found_successor.address
+        logging.debug(f'Node {self.digest_id} initialized successor {self.successor} at {self.successor_address}')
 
-    def stabilize(self):
-        me = self.successor.predecessor
-        if me and open_open(self.digest_id, self.successor.digest_id, me.digest_id):
-            self.successor = me
-
-        self.successor.notify(self)
-
-    def notify(self, other):
+    def notify(self, other, other_address):
+        logging.debug(f'Node {self.digest_id} notified by node {other}')
         if not self.predecessor \
-                or open_open(self.predecessor.digest_id, self.digest_id, other.digest_id):
+                or open_open(self.predecessor, self.digest_id, other):
+            logging.debug(f'Node {self.digest_id} updating predecessor')
             self.predecessor = other
+            self.predecessor_address = other_address
 
     def fix_fingers(self):
         self.init_fingers()
 
+    def stabilize_loop(self, context: zmq.Context):
+        pair = context.socket(zmq.PAIR)
+        pair.connect(self.stabilize_address)
+
+        while True:
+            time.sleep(5)
+            self._stabilize(pair)
+
+    def _stabilize(self, pair):
+        logging.debug(f'Node {self.digest_id} running stabilize')
+
+        pred_id, pred_addr = self._get_predecessor(pair)
+        if pred_id and open_open(self.digest_id, self.successor, pred_id):
+            logging.debug(f'Node {self.digest_id} found new successor {pred_id}')
+            self.successor = pred_id
+            self.successor_address = pred_addr
+
+        logging.debug(f'Node {self.digest_id} notifying successor {self.successor}')
+        self._notify_successor(pair)
+
+    @staticmethod
+    def _notify_successor(pair):
+        notify_cmd = vars(NotifyCommand())
+        pair.send(Command.NOTIFY, zmq.SNDMORE)
+        pair.send_json(notify_cmd)
+
+    @staticmethod
+    def _get_predecessor(pair):
+        predecessor_cmd = vars(PredecessorCommand())
+        pair.send(Command.GET_SUCCESSOR_PREDECESSOR, zmq.SNDMORE)
+        pair.send_json(predecessor_cmd)
+
+        cmd_id = pair.recv()
+        message = pair.recv_json()
+        cmd = PredecessorCommand.parse(message)
+        return cmd.succ_pred, cmd.succ_pred_address
+
     def run(self):
         logging.info(f'Starting loop for node {self.digest_id}')
 
+        stability = self.context.socket(zmq.PAIR)
+        stability.bind(self.stabilize_address)
+
+        poller = zmq.Poller()
+        poller.register(self.receiver, zmq.POLLIN)
+        poller.register(stability, zmq.POLLIN)
+
         while True:
 
-            # Receive the message
-            cmd = self.receiver.recv()
-            message = self.receiver.recv_json()
-            logging.debug(f'Node {self.digest_id} received message {message}')
+            socks = dict(poller.poll())
 
-            # Process the message
-            command = parsers[cmd](message)
-            result = command.execute(self)
+            for sock in socks:
+                # Receive the message
+                cmd = sock.recv()
+                message = sock.recv_json()
+                logging.debug(f'Node {self.digest_id} received {cmd} message {message}')
 
-            # Process results
-            if result:
-                self.route_result(result[0], result[1], result[2], result[3])
+                # Process the message
+                command = parsers[cmd](message)
+                result = command.execute(self)
+
+                # Process results
+                if result:
+                    address = result[0]
+                    identity = result[1]
+                    next_cmd = result[2]
+                    parameters = result[3]
+
+                    if address == self.stabilize_address and not identity:
+                        stability.send(next_cmd, zmq.SNDMORE)
+                        stability.send_json(parameters)
+                    else:
+                        self.route_result(address, identity, next_cmd, parameters)
 
     def route_result(self, address, identity, next_cmd, parameters):
-        logging.info(f'Node {self.digest_id} sending {parameters} to node {identity}')
+        logging.info(f'Node {self.digest_id} sending {next_cmd} with {parameters} to node {identity}')
         if address not in self.connected:
             self.connected.add(address)
             self.router.connect(address)
@@ -167,7 +223,9 @@ class ChordNode(Node):
 
 
 class Command:
-    FIND_SUCCESSOR = struct.pack('i', 0)
+    FIND_SUCCESSOR = b'FIND_SUCCESSOR'
+    GET_SUCCESSOR_PREDECESSOR = b'GET_PREDECESSOR'
+    NOTIFY = b'NOTIFY'
 
     def execute(self, node):
         pass
@@ -179,8 +237,53 @@ class Command:
         return cmd
 
 
-class FindSuccessorCommand(Command):
+class NotifyCommand(Command):
 
+    def __init__(self):
+        self.initiator_id = None
+        self.initiator_address = None
+
+    def execute(self, node):
+        if not self.initiator_id and not self.initiator_address:
+            self.initiator_id = node.digest_id
+            self.initiator_address = node.internal_endpoint
+            return node.successor_address, node.successor, Command.NOTIFY, vars(self)
+        else:
+            node.notify(self.initiator_id, self.initiator_address)
+
+    @staticmethod
+    def parse(parameters):
+        cmd = NotifyCommand()
+        return  Command.parse(cmd, parameters)
+
+
+class PredecessorCommand(Command):
+
+    def __init__(self):
+        self.return_id = None
+        self.return_address = None
+        self.succ_pred = None
+        self.succ_pred_address = None
+
+    def execute(self, node):
+        if not self.return_id and not self.return_address:
+            self.return_id = node.digest_id
+            self.return_address = node.internal_endpoint
+            return node.successor_address, node.successor, Command.GET_SUCCESSOR_PREDECESSOR, vars(self)
+        elif not self.succ_pred:
+            self.succ_pred = node.successor
+            self.succ_pred_address = node.successor_address
+            return self.return_address, self.return_id, Command.GET_SUCCESSOR_PREDECESSOR, vars(self)
+        else:
+            return node.stabilize_address, None, Command.GET_SUCCESSOR_PREDECESSOR, vars(self)
+
+    @staticmethod
+    def parse(parameters):
+        cmd = PredecessorCommand()
+        return Command.parse(cmd, parameters)
+
+
+class FindSuccessorCommand(Command):
     RETURN_TYPE_NODE = 0
     RETURN_TYPE_CLIENT = 1
 
@@ -201,6 +304,7 @@ class FindSuccessorCommand(Command):
                 node.fingers[self.return_data] = self.successor
                 node.finger_addresses[self.return_data] = self.address
                 node.router.connect(self.address)
+                node.connected.add(self.address)
             elif self.return_type == self.RETURN_TYPE_CLIENT:
                 pass
         else:
@@ -215,7 +319,9 @@ class FindSuccessorCommand(Command):
         return Command.parse(cmd, parameters)
 
 
-parsers = {Command.FIND_SUCCESSOR: FindSuccessorCommand.parse}
+parsers = {Command.FIND_SUCCESSOR: FindSuccessorCommand.parse,
+           Command.GET_SUCCESSOR_PREDECESSOR: PredecessorCommand.parse,
+           Command.NOTIFY: NotifyCommand.parse}
 
 
 def main():
@@ -233,8 +339,36 @@ def main():
     node1_t = threading.Thread(target=node1.run, daemon=True)
     node1_t.start()
 
-    print('Node 2 joins node1')
+    print('Node 2 joins Node 1')
     node2.join(node1.digest_id, node1.internal_endpoint)
+
+    print('Result:')
+    print(chord.finger_table_links(node1))
+    print(chord.finger_table_links(node2))
+
+    print('Starting node 2')
+    node2_t = threading.Thread(target=node2.run, daemon=True)
+    node2_t.start()
+
+    print('Stabilize Node 2')
+    pair = node2.context.socket(zmq.PAIR)
+    pair.connect(node2.stabilize_address)
+    node2._stabilize(pair)
+
+    print('Wait for execution to complete')
+    time.sleep(5)
+
+    print('Result:')
+    print(chord.finger_table_links(node1))
+    print(chord.finger_table_links(node2))
+
+    print('Stabilize Node 1')
+    pair = node1.context.socket(zmq.PAIR)
+    pair.connect(node1.stabilize_address)
+    node1._stabilize(pair)
+
+    print('Wait for execution to complete')
+    time.sleep(5)
 
     print('Result:')
     print(chord.finger_table_links(node1))

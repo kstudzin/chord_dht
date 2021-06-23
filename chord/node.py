@@ -104,16 +104,17 @@ class Node:
         if digest == self.digest_id:
             return True, self.digest_id, self.internal_endpoint, hops
 
-        next_id = self.successor
+        logging.debug(f"    Is id {digest} contained in ({self.digest_id}, {self.successor}]?")
+        if open_closed(self.digest_id, self.successor, digest):
 
-        logging.debug(f"    Is id {digest} contained in ({self.digest_id}, {next_id}]?")
-
-        if open_closed(self.digest_id, next_id, digest):
-
-            logging.debug(f"      Yes, returning successor {next_id} hops: {hops}")
+            # We have found the successor and will return it to the requester
+            logging.debug(f"      Yes, returning successor {self.successor} hops: {hops}")
             return True, self.successor, self.successor_address, hops + 1
         else:
 
+            # We have not found the successor of the digest. Return the next node
+            # to advance to. For the naive nodes, this is also the successor. For
+            # chord nodes, this is either a node from the finger table or the successor
             logging.debug(f"      No, finding closest preceding node")
             next_node, next_address = self.find_next_node(digest)
             return False, next_node, next_address, hops + 1
@@ -257,25 +258,26 @@ class Node:
 
 class ChordNode(Node):
 
-    def __init__(self, node_name, node_id):
-        super().__init__(node_name, node_id)
+    def __init__(self, node_name, node_id, address, external_port=None, internal_port=None):
+        super().__init__(node_name, node_id, address, external_port, internal_port)
 
     def find_next_node(self, digest):
         return self.closest_preceding_node(digest)
 
     def closest_preceding_node(self, digest):
 
-        for finger in reversed(self.fingers):
+        for finger, address in zip(reversed(self.fingers), reversed(self.finger_addresses)):
             if not finger:
                 continue
 
-            logging.debug(f"      Is {finger.get_id()} in ({self.digest_id, digest})?")
-            if open_open(self.digest_id, digest, finger.get_id()):
-                logging.debug(f"        Yes, returning finger {finger.get_id()}")
-                return finger
+            logging.debug(f"      Is {finger} in ({self.digest_id, digest})?")
+            if open_open(self.digest_id, digest, finger):
 
-        logging.debug(f"      Finger not found. Returning successor {self.successor.get_id()}")
-        return self.successor
+                logging.debug(f"        Yes, returning finger {finger}")
+                return finger, address
+
+        logging.debug(f"      Finger not found. Returning successor {self.successor}")
+        return self.successor, self.successor_address
 
 
 class Command:
@@ -398,69 +400,9 @@ def finger_table_links(node):
 
     return table
 
+
 def main():
-    print('Creating node 1')
-    name1 = 'node_0'
-    digest1 = hash_value(name1)
-    node1 = Node(name1, digest1, 'tcp://127.0.0.1', '5500', '5501')
-
-    print('Creating node 2')
-    name2 = 'node_1'
-    digest2 = hash_value(name2)
-    node2 = Node(name2, digest2, 'tcp://127.0.0.1', '5502', '5503')
-
-    print('Staring node 1')
-    node1_t = threading.Thread(target=node1.run, daemon=True)
-    node1_t.start()
-
-    print('Node 2 joins Node 1')
-    node2.join(node1.digest_id, node1.internal_endpoint)
-
-    print('Result:')
-    print(chord.finger_table_links(node1))
-    print(chord.finger_table_links(node2))
-
-    print('Starting node 2')
-    node2_t = threading.Thread(target=node2.run, daemon=True)
-    node2_t.start()
-
-    print('Stabilize Node 2')
-    pair = node2.context.socket(zmq.PAIR)
-    pair.connect(node2.stabilize_address)
-    node2._stabilize(pair)
-
-    print('Wait for execution to complete')
-    time.sleep(5)
-
-    print('Result:')
-    print(chord.finger_table_links(node1))
-    print(chord.finger_table_links(node2))
-
-    print('Stabilize Node 1')
-    pair = node1.context.socket(zmq.PAIR)
-    pair.connect(node1.stabilize_address)
-    node1._stabilize(pair)
-
-    print('Wait for execution to complete')
-    time.sleep(5)
-
-    print('Result:')
-    print(chord.finger_table_links(node1))
-    print(chord.finger_table_links(node2))
-
-    print('Fixing fingers')
-    fix_pair1 = node1.context.socket(zmq.PAIR)
-    fix_pair1.connect(node1.fix_fingers_address)
-    node1._init_fingers(fix_pair1)
-
-    fix_pair2 = node2.context.socket(zmq.PAIR)
-    fix_pair2.connect(node2.fix_fingers_address)
-    node2._init_fingers(fix_pair2)
-
-    print('Result:')
-    pp = pprint.PrettyPrinter()
-    pp.pprint(chord.finger_table_links(node1))
-    pp.pprint(chord.finger_table_links(node2))
+    pass
 
 
 if __name__ == '__main__':

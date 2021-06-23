@@ -17,11 +17,13 @@ def test_join():
     digest2 = hash_value(name2)
     node2 = Node(name2, digest2, 'tcp://127.0.0.1', '5502', '5503')
 
-    node1_t = threading.Thread(target=node1.run, daemon=True)
+    node1_t = threading.Thread(target=node1.run, args=[None, None], daemon=True)
     node1_t.start()
 
-    node2.join(node1.digest_id, node1.internal_endpoint)
+    joined = node2.join(node1.digest_id, node1.internal_endpoint)
+    assert joined
 
+    logging.info('Test join')
     assert node1.fingers == [None] * NUM_BITS
     assert node1.finger_addresses == [None] * NUM_BITS
     assert node1.successor == 160
@@ -36,9 +38,10 @@ def test_join():
     assert node2.predecessor is None
     assert node2.predecessor_address is None
 
-    node2_t = threading.Thread(target=node2.run, daemon=True)
+    node2_t = threading.Thread(target=node2.run, args=[None, None], daemon=True)
     node2_t.start()
 
+    logging.info('Running stabilize for node 2')
     pair = node2.context.socket(zmq.PAIR)
     pair.connect(node2.stabilize_address)
     node2._stabilize(pair)
@@ -47,6 +50,7 @@ def test_join():
     # so wait until it is likely complete
     time.sleep(.5)
 
+    logging.info('Test stabilize node 2')
     assert node1.fingers == [None] * NUM_BITS
     assert node1.finger_addresses == [None] * NUM_BITS
     assert node1.successor == 163
@@ -69,6 +73,7 @@ def test_join():
     # so wait until it is likely complete
     time.sleep(.5)
 
+    logging.info('Test stabilize node3')
     assert node1.fingers == [None] * NUM_BITS
     assert node1.finger_addresses == [None] * NUM_BITS
     assert node1.successor == 163
@@ -91,6 +96,7 @@ def test_join():
     fix_pair2.connect(node2.fix_fingers_address)
     node2._init_fingers(fix_pair2)
 
+    logging.info('Test final state')
     assert node1.fingers == [163, 163, 160, 160, 160, 160, 160, 160]
     assert node1.finger_addresses == ['tcp://127.0.0.1:5503',
                                       'tcp://127.0.0.1:5503',

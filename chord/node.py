@@ -1,14 +1,18 @@
+import argparse
 import logging
 import pprint
 import struct
+import sys
 import threading
 import time
+from random import randrange
+from urllib.parse import urlparse
 
 import zmq
 
-import chord
 from util import open_closed, open_open
 from hash import NUM_BITS, hash_value
+
 
 # -----------------------------------------------------------------------------
 # Networked Chord Implementation
@@ -50,6 +54,7 @@ class Node:
         self.fix_fingers_address = f'inproc://fix_fingers_{self.digest_id}'
 
         self.connected = set()
+        self.shutdown = False
 
         # Pointers to network nodes
         self.successor = self.digest_id
@@ -139,7 +144,15 @@ class Node:
         found_successor = FindSuccessorCommand.parse(result)
         self.successor = found_successor.successor
         self.successor_address = found_successor.address
+
+        # If the found successor has the same id as we do, there is already
+        # a node the same value in the network and we cannot join with that id
+        if self.successor == self.digest_id:
+            self.context.destroy()
+            return False
+
         logging.debug(f'Node {self.digest_id} initialized successor {self.successor} at {self.successor_address}')
+        return True
 
     def notify(self, other, other_address):
         logging.debug(f'Node {self.digest_id} notified by node {other}')
@@ -154,21 +167,27 @@ class Node:
                 self.successor = self.predecessor
                 self.successor_address = self.predecessor_address
 
-    def fix_fingers(self, context):
+    def fix_fingers_loop(self, context, interval):
         pair = context.socket(zmq.PAIR)
         pair.connect(self.fix_fingers_address)
 
-        while True:
-            time.sleep(5)
-            self._init_fingers(pair)
+        try:
+            while True:
+                time.sleep(interval)
+                self._init_fingers(pair)
+        finally:
+            pair.disconnect(self.fix_fingers_address)
 
-    def stabilize_loop(self, context: zmq.Context):
+    def stabilize_loop(self, context, interval):
         pair = context.socket(zmq.PAIR)
         pair.connect(self.stabilize_address)
 
-        while True:
-            time.sleep(5)
-            self._stabilize(pair)
+        try:
+            while True:
+                time.sleep(interval)
+                self._stabilize(pair)
+        finally:
+            pair.disconnect(self.stabilize_address)
 
     def _stabilize(self, pair):
         logging.debug(f'Node {self.digest_id} running stabilize')
@@ -199,7 +218,7 @@ class Node:
         cmd = PredecessorCommand.parse(message)
         return cmd.succ_pred, cmd.succ_pred_address
 
-    def run(self):
+    def run(self, stabilize_interval=5, fix_fingers_interval=7):
         logging.info(f'Starting loop for node {self.digest_id}')
 
         stability = self.context.socket(zmq.PAIR)
@@ -213,35 +232,66 @@ class Node:
         poller.register(stability, zmq.POLLIN)
         poller.register(fix_fingers, zmq.POLLIN)
 
-        while True:
+        if stabilize_interval:
+            stability_t = threading.Thread(target=self.stabilize_loop,
+                                           args=[self.context, stabilize_interval],
+                                           daemon=True)
+            stability_t.start()
 
-            socks = dict(poller.poll())
+        if fix_fingers_interval:
+            fix_fingers_t = threading.Thread(target=self.fix_fingers_loop,
+                                             args=[self.context, fix_fingers_interval],
+                                             daemon=True)
+            fix_fingers_t.start()
 
-            for sock in socks:
-                # Receive the message
-                cmd = sock.recv()
-                message = sock.recv_json()
-                logging.debug(f'Node {self.digest_id} received {cmd} message {message}')
+        try:
+            while True:
 
-                # Process the message
-                command = parsers[cmd](message)
-                result = command.execute(self)
+                logging.info(f'Node {self.digest_id} waiting for messages')
+                socks = dict(poller.poll())
+                received_exit = self.process_input(socks, stability, fix_fingers)
+                if received_exit:
+                    break
 
-                # Process results
-                if result:
-                    address = result[0]
-                    identity = result[1]
-                    next_cmd = result[2]
-                    parameters = result[3]
+        finally:
+            self.context.destroy()
+            self.shutdown = True
 
-                    if address == self.stabilize_address and not identity:
-                        stability.send(next_cmd, zmq.SNDMORE)
-                        stability.send_json(parameters)
-                    elif address == self.fix_fingers_address and not identity:
-                        fix_fingers.send(next_cmd, zmq.SNDMORE)
-                        fix_fingers.send_json(parameters)
-                    else:
-                        self.route_result(address, identity, next_cmd, parameters)
+        logging.info('Goodbye!')
+
+    def process_input(self, socks, stability, fix_fingers):
+        logging.info(f'Node {self.digest_id} processing {len(socks)} messages')
+        for sock in socks:
+            # Receive the message
+            cmd = sock.recv()
+            if cmd == Command.EXIT:
+                logging.info(f'Node {self.digest_id} received EXIT message. Node shutting down.')
+                return True
+
+            message = sock.recv_json()
+            logging.debug(f'Node {self.digest_id} received {cmd} message {message}')
+
+            # Process the message
+            command = parsers[cmd](message)
+            result = command.execute(self)
+
+            # Process results
+            if result:
+                address = result[0]
+                identity = result[1]
+                next_cmd = result[2]
+                parameters = result[3]
+
+                if address == self.stabilize_address and not identity:
+                    stability.send(next_cmd, zmq.SNDMORE)
+                    stability.send_json(parameters)
+                elif address == self.fix_fingers_address and not identity:
+                    fix_fingers.send(next_cmd, zmq.SNDMORE)
+                    fix_fingers.send_json(parameters)
+                else:
+                    self.route_result(address, identity, next_cmd, parameters)
+
+            return False
 
     def route_result(self, address, identity, next_cmd, parameters):
         logging.info(f'Node {self.digest_id} sending {next_cmd} with {parameters} to node {identity} at {address}')
@@ -272,7 +322,6 @@ class ChordNode(Node):
 
             logging.debug(f"      Is {finger} in ({self.digest_id, digest})?")
             if open_open(self.digest_id, digest, finger):
-
                 logging.debug(f"        Yes, returning finger {finger}")
                 return finger, address
 
@@ -284,6 +333,7 @@ class Command:
     FIND_SUCCESSOR = b'FIND_SUCCESSOR'
     GET_SUCCESSOR_PREDECESSOR = b'GET_PREDECESSOR'
     NOTIFY = b'NOTIFY'
+    EXIT = b'EXIT'
 
     def execute(self, node):
         pass
@@ -312,7 +362,7 @@ class NotifyCommand(Command):
     @staticmethod
     def parse(parameters):
         cmd = NotifyCommand()
-        return  Command.parse(cmd, parameters)
+        return Command.parse(cmd, parameters)
 
 
 class PredecessorCommand(Command):
@@ -401,8 +451,127 @@ def finger_table_links(node):
     return table
 
 
+def handle_shutdown(name, address, internal_port):
+    endpoint = f'{address}:{internal_port}'
+    digest = hash_value(name)
+
+    try:
+        context = zmq.Context()
+        shutdown_socket = context.socket(zmq.ROUTER)
+        shutdown_socket.connect(endpoint)
+        time.sleep(0.5)
+
+        identity = struct.pack('i', digest)
+        shutdown_socket.send(identity, zmq.SNDMORE)
+        shutdown_socket.send(Command.EXIT)
+    finally:
+        shutdown_socket.disconnect(endpoint)
+        context.destroy()
+
+
+def handle_new_node(name, address, external_port, internal_port, action, max_retries,
+                    known_endpoint, known_name, stabilize_interval, fix_fingers_interval):
+    node = Node(name, hash_value(name), address, external_port, internal_port)
+    if action == 'join':
+        if not known_endpoint or not known_name:
+            return 1, 'Error: Could not join network. Must have known name and known address to join network'
+
+        joined = node.join(hash_value(known_name), known_endpoint)
+        for i in range(max_retries):
+            if joined:
+                break
+            name = f'node_{randrange(999)}'
+            node = Node(name, hash_value(name), address, external_port, internal_port)
+            joined = node.join(hash_value(known_name), known_endpoint)
+
+        if not joined:
+            return 2, 'Error: Unable to join network. Max retries reached.'
+
+    node_t = threading.Thread(target=node.run, args=[stabilize_interval, fix_fingers_interval])
+    node_t.start()
+
+    return 0, node
+
+
+def port(port_val):
+    url = urlparse(f"//:{port_val}")
+    if url.port:
+        return port_val
+
+
+def config_parser():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('action', choices=['create', 'join', 'shutdown'],
+                        help='create to create a network, i.e. this node is the first to join.\n'
+                             'join to join an existing network')
+    parser.add_argument('name', type=str, help='Name of node to create')
+    parser.add_argument('address', type=str, help='Address of node')
+
+    parser.add_argument('--known-endpoint', '-ke', type=str,
+                        help='Endpoint of node in network. Required to join an existing network.')
+    parser.add_argument('--known-name', '-kn', type=str,
+                        help='Name of a node in network. Required to join an existing network.')
+
+    parser.add_argument('--internal-port', '-i', type=port, default=None,
+                        help='port for chord node to receive messages from other chord nodes')
+    parser.add_argument('--external-port', '-e', type=port, default=None,
+                        help='port for clients to communicate with chord node')
+    parser.add_argument('--stabilize-interval', '-s', type=int, default=60,
+                        help='seconds between stabilize executions')
+    parser.add_argument('--fix-fingers-interval', '-f', type=int, default=50,
+                        help='seconds between fix fingers executions')
+    parser.add_argument('--quiet', '-q', action='store_true',
+                        help='Print less log info')
+
+    parser.add_argument('--max-retries', '-r', type=int, default=0,
+                        help='number of times to retry joining the network with new, generated name')
+
+    return parser
+
+
 def main():
-    pass
+    pp = pprint.PrettyPrinter()
+
+    parser = config_parser()
+    args = parser.parse_args()
+
+    action = args.action
+    name = args.name
+    address = args.address
+
+    known_endpoint = args.known_endpoint
+    known_name = args.known_name
+
+    external_port = args.external_port
+    internal_port = args.internal_port
+    stabilize_interval = args.stabilize_interval
+    fix_fingers_interval = args.fix_fingers_interval
+    quiet = args.quiet
+
+    max_retries = args.max_retries
+
+    if action == 'create' or action == 'join':
+        result = handle_new_node(name, address, external_port, internal_port, action,
+                                 max_retries, known_endpoint, known_name, stabilize_interval,
+                                 fix_fingers_interval)
+        if result[0] != 0:
+            print(result[1], file=sys.stderr)
+            exit(result[0])
+
+        node = result[1]
+        print(f'Node {node.name} joined network')
+
+        while not quiet:
+            pp.pprint(finger_table_links(node))
+            if node.shutdown:
+                break
+            time.sleep(30)
+
+    elif action == 'shutdown':
+        print('Shutting down...')
+        handle_shutdown(name, address, internal_port)
+        print(f'Shutdown node {name}')
 
 
 if __name__ == '__main__':

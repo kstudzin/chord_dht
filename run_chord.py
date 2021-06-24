@@ -8,7 +8,7 @@ from mininet.topo import SingleSwitchTopo, Topo
 
 name_fmt = 'node_{id}'
 cmd_fmt = 'python chord/node.py {action} {name} tcp://{ip} --internal-port 5555 ' \
-          '--external-port 5556 --stabilize-interval 10 --fix-fingers-interval 15 ' \
+          '--external-port 5556 --stabilize-interval 5 --fix-fingers-interval 7 ' \
           '{ext} &'
 join_fmt_ext = '--known-endpoint tcp://{ip}:5555 --known-name {name}'
 shutdown_cmd_fmt = 'python chord/node.py shutdown {name} tcp://{ip} --internal-port 5555'

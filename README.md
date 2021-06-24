@@ -11,6 +11,7 @@ From the project root run the following commands:
 1. `source env.sh` 
    _(Note: This will need to be run every time you open a new shell. To avoid re-running, add the contents to your shell profile.)_ 
 2. `pip install -r requirements.txt`
+3. Set log level in `chord/util.py`. Logs are in `chord.log` from the directory the code was run from. _Node: DEBUG has a lot of logging_ 
 
 ### Testing
 
@@ -262,49 +263,87 @@ The tests create a new node named `node_added_0` whose digest is `218`. The sync
 
 ### Run Chord on Mininet
 
-**File:** `chord/node.py` <br>
+**File:** `chord/node.py`, `run_chord.py` <br>
 **Python structure:** `chord.node.Node`, `chord.node.ChordNode`, `chord.node.Command`, `chord.node.FindSuccessorCommand`, `chord.node.PredecessorCommand`, `chord.node.NotifyCommand`
 
 #### Design
 
 _**Socket Initialization**_
 
-Sockets are initialized in the constructor so that they are available to `join()` before they are used in `run()`.
+Sockets are instance attributes - except for the pair sockets used in threads. They are bound in the constructor so that they are available to `join()` before they are used in `run()`.
 
 _**Node Sockets**_
 
-Each Node has two sockets for communicating with other Nodes: ROUTER and DEALER. We use these sockets to apply an asynchronous request-reply pattern. When nodes send messages to other nodes, they do not care about a reply. For example, in `find_successor()` when a node finds the next node to query, it simply wants to pass of the responsibility to that node.
+Each Node has two sockets for communicating with other Nodes: ROUTER and DEALER. We use these sockets so that nodes can communicate asynchronously. When nodes send messages to other nodes, they do not wait for a reply. For example, in `find_successor()` when a node finds the next node to query, it simply wants to pass of the responsibility to that node. When a client communicates with a node, it may receive a reply from a different node.
 
-The ROUTER socket is used because it can send messages to specific sockets and receive the identity of sockets that send messages to it. It needs to be able to send messages to specific sockets because that is how it communicates with the other network nodes it knows about. It needs to know the identity of sockets that send messages to it when it talks to clients. When a client wants to 
+The ROUTER socket is used because it can send messages to specific sockets and receive the identity of sockets that send messages to it. It needs to be able to send messages to specific sockets because that is how it communicates with specific network nodes it knows about. It needs to know the identity of sockets that send messages to it when it talks to clients. When a client wants information from the network, it will send a message to some node in the network. That node will forward the message to other nodes as the network searches for the requested data. The network node that received the client message will insert an identifier for the client into the message so that the node that has the data is able to return the data to the appropriate client. In this system the ROUTER socket is used to send messages to internal nodes and external clients as well as to receive messages from clients.
 
-The DEALER socket is used because it can specify its identity so that the ROUTER socket can send messages directly to it. 
+The DEALER socket is used because it can specify its identity so that the ROUTER socket can send messages directly to it. It is used to receive messages from other nodes in the network.
 
 _**Threads**_
 
-Running Chord on Mininet requires synchronization tasks to run periodically. To do that, we run threads that threads will tell the main thread to execute a command at specified time intervals. The reason that these threads communicate with the main thread rather than executing the command themselves is that the execution requires using sockets that the main thread is using. Because sockets are not thread-safe, we do not want to do that. Instead, we use PAIR sockets and inproc communication for threads to communicate.
+Running Chord requires synchronization tasks to run periodically to incorporate newly joined nodes into the network. To do that, we run threads that  initiate the tasks of stabilizing nodes and fixing finger tables. These tasks require communication with other nodes in the network. Because sockets are not thread safe, the threads use PAIR sockets to notify the main thread when a task needs to be done. Threads use subclasses of the `Command` class to specify the task that needs to be completed, and the main thread performs the task. Command classes also allows the main thread to handle manipulating of instance attributes to avoid concurrency problems.
+
+_**Commands**_
+
+The `Command` classes provide a template for messages nodes pass to each other, encapsulate the data and logic associated with each operation, and abstract the operation logic from the node itself. As we will see in later tasks, the `Command` class allows us to add new commands, such as `get` and `put`, without changing large parts of the core node code. 
+
+#### Execution
+
+```
+# Unit tests
+pytest tests/integration/test_networked_node.py
+
+# CLI
+
+## Start the first node
+python node.py create node_0 tcp://127.0.0.1 --internal-port 5501 --external-port 5502
+
+## Start a second node
+python node.py join node_1 tcp://127.0.0.1 --internal-port 5503 --external-port 5504 --known-endpoint tcp://127.0.0.1:5501 --known-name node_0
+
+## Shut down the first node
+ python node.py shutdown node_0 tcp://127.0.0.1 --internal-port 5501
+
+## Run on mininet
+sudo python run_chord.py 25
+```
+
+#### Results
+
+When running on mininet, set the log level to INFO in `chord/util.py` to see the nodes start the main execution loop and print their finger tables, successors, and predecessor as they exit. The script that runs the topology brings up each node, waits some amount of time for the network to stabilize, and then shuts down each node. At this stage, setting the stabilize interval and the fix fingers interval is hard coded into the script. When setting this number is important to balance not running to frequently. If run every second, for example, some nodes may hog the processor and others won't have their synchronization tasks run. On the other hand setting to interval too long means waiting for the script to complete while no work is happening. Note that this script sleeps in between bringing the nodes up and shutting them down to allow time to stabilize. The amount of time it sleeps is dependent on how many nodes are running. I chose the amount of time per node to be slightly longer than the longer interval of stabilize and fix fingers. This is to ensure that fix fingers gets a chance to run after stabilize on each node.
 
 ## TODO
 
 #### High Priority (Functional)
 
+- [x] `join()` fails if found successor has same id as joining node
 - [ ] Add code to get commands from clients
-- [ ] Accept port for router socket. Needs to be bound before dealer binds to random port
+- [ ] Add `pytest-mock` to `requirements.txt`
+- [ ] Testing specify id that acts like a hash to avoid collisions in small address space
+- [x] Accept port for router socket. Needs to be bound before dealer binds to random port
+- [ ] Main thread sends exit message to pair sockets. Pair polls - this is the only async message they receive. What happens if they get exit message when waiting for other message?
+- [ ] Investigate why some nodes hang on `context.destroy()`
 
 #### Low Priority (Code Quality)
 
-- [ ] Command should be bytes not ints because that's how they will be sent across the wire
+- [ ] Use timers rather than threads sleeping for stabilize and fix fingers
+- [ ] Add `run_chord.py` options to set stabilize and fix fingers intervals
+- [ ] `Command.execute()` could share more code between subclasses
+- [ ] Add optimization to `find_successor()` to see if current node is successor: if predecessor is set, check if the digest is between predecessor and current node
 - [ ] Search for node rather than iterate in `consistent_load_balancer`
-- [ ] Move `fix_fingers()` into `__init__()` or `set_successor()`
-- [ ] Add succeeding node list and use it to jump further if fingers not there
 - [ ] Use data frames instead of pretty printing output
 - [ ] Load balancers share a lot of code and could be consolidated
 - [ ] Make `num_keys` optional in `directchord.py`
 - [ ] Use subparser instead of `--actions` in `directchord.py` 
-- [ ] FOR_NODE and FOR_CLIENT don't really belong in Command
+- [ ] Validate url formatting
+- [ ] Separate finger node tests and stability tests from `test_networked_node`
+- [ ] Add code to help approximate stabilize and fix fingers intervals as well as time to reach steady state
 
 ## Questions
 
 - ~~Should nodes a have reply socket that will send synchronous replies for predecessor requests? No, as the docs note, there is no advantage to router-rep over router-dealer~~
 - ~~What is the use case for POLLOUT? Receiving from multiple sockets~~
-- Only nodes call find successor; clients call get and put. OR nodes call find successor to get the identity of the hosting node and then get data from host directly.
-- How does a node know if a found successor message is for it or for a client? How does fix_fingers know which k a found successor is for?
+- ~~Only nodes call find successor; clients call get and put. OR nodes call find successor to get the identity of the hosting node and then get data from host directly.~~
+- ~~How does a node know if a found successor message is for it or for a client? How does fix_fingers know which k a found successor is for?~~
+- What happens if 2 nodes with the same digest enter at the same time?

@@ -34,7 +34,7 @@ def test_init_fingers(mock_zmq):
 
     results = zip(node.fingers, node.finger_addresses)
     for actual in results:
-        assert actual == (163, 'tcp://127.0.0.1:5555')
+        assert actual == (None, None)
 
 
 @mock.patch('chord.node.zmq')

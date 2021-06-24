@@ -169,7 +169,7 @@ class Node:
                 self._init_fingers(pair)
                 time.sleep(interval)
         finally:
-            pair.disconnect(self.fix_fingers_address)
+            pair.close()
 
     def stabilize_loop(self, context, interval):
         pair = context.socket(zmq.PAIR)
@@ -180,7 +180,7 @@ class Node:
                 self._stabilize(pair)
                 time.sleep(interval)
         finally:
-            pair.disconnect(self.stabilize_address)
+            pair.close()
 
     def _stabilize(self, pair):
         logging.debug(f'Node {self.digest_id} running stabilize')
@@ -241,17 +241,12 @@ class Node:
                 if received_exit:
                     break
 
-            logging.info(f'Node {self.digest_id} out of loop')
+            logging.info(f'Node {self.digest_id} shutting down...')
+            logging.info(finger_table_links(self))
+
         finally:
-            logging.info(f'Node {self.digest_id} shutting down')
             self.context.destroy()
-            logging.info(f'Node {self.digest_id} context is closed')
             self.shutdown = True
-            logging.info(f'Finger table for node {self.digest_id}:')
-            if self.fingers == [None] * NUM_BITS:
-                logging.info(f'Node {self.digest_id} has no finger entries')
-            else:
-                logging.info(finger_table_links(self))
 
         logging.info(f'Node {self.digest_id} says Goodbye!')
 

@@ -59,8 +59,8 @@ class Node:
         # Pointers to network nodes
         self.successor = self.digest_id
         self.successor_address = self.internal_endpoint
-        self.predecessor = None
-        self.predecessor_address = None
+        self.predecessor = self.digest_id
+        self.predecessor_address = self.internal_endpoint
         self.fingers = [None] * NUM_BITS
         self.finger_addresses = [None] * NUM_BITS
 
@@ -77,24 +77,23 @@ class Node:
         self.successor = successor
 
     def _init_fingers(self, pair):
-        logging.info(f"Building finger table for {self.name} (Digest: {self.digest_id})")
+        logging.debug(f"Building finger table for {self.name} (Digest: {self.digest_id})")
 
         i = 0
         next_key = (self.digest_id + pow(2, i)) % (pow(2, NUM_BITS) - 1)
         while i < NUM_BITS:
-            finger, finger_address = self._find_successor(pair, next_key)
-            self.fingers[i] = finger
-            self.finger_addresses[i] = finger_address
-            logging.info(f"  Found finger {i} is successor({next_key}) = {self.fingers[i]}")
+            self._find_successor(pair, next_key, i)
+            logging.debug(f"  Found finger {i} is successor({next_key}) = {self.fingers[i]}")
 
             i += 1
             next_key = (self.digest_id + pow(2, i)) % (pow(2, NUM_BITS) - 1)
 
-    def _find_successor(self, pair, digest):
+    def _find_successor(self, pair, digest, index):
         cmd = FindSuccessorCommand()
         cmd.return_id = self.digest_id
         cmd.return_address = self.internal_endpoint
         cmd.return_type = FindSuccessorCommand.RETURN_TYPE_NODE
+        cmd.return_data = index
         cmd.digest = digest
 
         pair.send(Command.FIND_SUCCESSOR, zmq.SNDMORE)
@@ -102,8 +101,7 @@ class Node:
 
         recv_cmd = pair.recv()
         found = pair.recv_json()
-        found_cmd = FindSuccessorCommand.parse(found)
-        return found_cmd.successor, found_cmd.address
+        return recv_cmd, found
 
     def find_successor(self, digest, hops):
         if digest == self.digest_id:
@@ -162,19 +160,14 @@ class Node:
             self.predecessor = other
             self.predecessor_address = other_address
 
-            # Set successor if there are only 2 nodes in the system
-            if open_open(self.digest_id, self.successor, self.predecessor):
-                self.successor = self.predecessor
-                self.successor_address = self.predecessor_address
-
     def fix_fingers_loop(self, context, interval):
         pair = context.socket(zmq.PAIR)
         pair.connect(self.fix_fingers_address)
 
         try:
             while True:
-                time.sleep(interval)
                 self._init_fingers(pair)
+                time.sleep(interval)
         finally:
             pair.disconnect(self.fix_fingers_address)
 
@@ -184,19 +177,15 @@ class Node:
 
         try:
             while True:
-                time.sleep(interval)
                 self._stabilize(pair)
+                time.sleep(interval)
         finally:
             pair.disconnect(self.stabilize_address)
 
     def _stabilize(self, pair):
         logging.debug(f'Node {self.digest_id} running stabilize')
 
-        pred_id, pred_addr = self._get_predecessor(pair)
-        if pred_id and open_open(self.digest_id, self.successor, pred_id):
-            logging.debug(f'Node {self.digest_id} found new successor {pred_id}')
-            self.successor = pred_id
-            self.successor_address = pred_addr
+        self._get_predecessor(pair)
 
         logging.debug(f'Node {self.digest_id} notifying successor {self.successor}')
         self._notify_successor(pair)
@@ -215,8 +204,7 @@ class Node:
 
         cmd_id = pair.recv()
         message = pair.recv_json()
-        cmd = PredecessorCommand.parse(message)
-        return cmd.succ_pred, cmd.succ_pred_address
+        return cmd_id, message
 
     def run(self, stabilize_interval=5, fix_fingers_interval=7):
         logging.info(f'Starting loop for node {self.digest_id}')
@@ -247,25 +235,33 @@ class Node:
         try:
             while True:
 
-                logging.info(f'Node {self.digest_id} waiting for messages')
+                logging.debug(f'Node {self.digest_id} waiting for messages')
                 socks = dict(poller.poll())
                 received_exit = self.process_input(socks, stability, fix_fingers)
                 if received_exit:
                     break
 
+            logging.info(f'Node {self.digest_id} out of loop')
         finally:
+            logging.info(f'Node {self.digest_id} shutting down')
             self.context.destroy()
+            logging.info(f'Node {self.digest_id} context is closed')
             self.shutdown = True
+            logging.info(f'Finger table for node {self.digest_id}:')
+            if self.fingers == [None] * NUM_BITS:
+                logging.info(f'Node {self.digest_id} has no finger entries')
+            else:
+                logging.info(finger_table_links(self))
 
-        logging.info('Goodbye!')
+        logging.info(f'Node {self.digest_id} says Goodbye!')
 
     def process_input(self, socks, stability, fix_fingers):
-        logging.info(f'Node {self.digest_id} processing {len(socks)} messages')
+        logging.debug(f'Node {self.digest_id} processing {len(socks)} messages')
         for sock in socks:
             # Receive the message
             cmd = sock.recv()
             if cmd == Command.EXIT:
-                logging.info(f'Node {self.digest_id} received EXIT message. Node shutting down.')
+                logging.debug(f'Node {self.digest_id} received EXIT message. Node shutting down.')
                 return True
 
             message = sock.recv_json()
@@ -294,7 +290,7 @@ class Node:
             return False
 
     def route_result(self, address, identity, next_cmd, parameters):
-        logging.info(f'Node {self.digest_id} sending {next_cmd} with {parameters} to node {identity} at {address}')
+        logging.debug(f'Node {self.digest_id} sending {next_cmd} with {parameters} to node {identity} at {address}')
         if address not in self.connected:
             self.connected.add(address)
             self.router.connect(address)
@@ -379,10 +375,14 @@ class PredecessorCommand(Command):
             self.return_address = node.internal_endpoint
             return node.successor_address, node.successor, Command.GET_SUCCESSOR_PREDECESSOR, vars(self)
         elif not self.succ_pred:
-            self.succ_pred = node.successor
-            self.succ_pred_address = node.successor_address
+            self.succ_pred = node.predecessor
+            self.succ_pred_address = node.predecessor_address
             return self.return_address, self.return_id, Command.GET_SUCCESSOR_PREDECESSOR, vars(self)
         else:
+            if self.succ_pred and \
+                    open_open(node.digest_id, node.successor, self.succ_pred):
+                node.successor = self.succ_pred
+                node.successor_address = self.succ_pred_address
             return node.stabilize_address, None, Command.GET_SUCCESSOR_PREDECESSOR, vars(self)
 
     @staticmethod
@@ -409,6 +409,8 @@ class FindSuccessorCommand(Command):
     def execute(self, node):
         if self.found:
             if self.return_type == self.RETURN_TYPE_NODE:
+                node.fingers[self.return_data] = self.successor
+                node.finger_addresses[self.return_data] = self.address
                 node.router.connect(self.address)
                 node.connected.add(self.address)
                 return node.fix_fingers_address, None, Command.FIND_SUCCESSOR, vars(self)
@@ -438,7 +440,7 @@ parsers = {Command.FIND_SUCCESSOR: FindSuccessorCommand.parse,
 def finger_table(node):
     fingers = node.fingers
     addresses = node.finger_addresses
-    table = [{"position": i, "id": finger, "name": address}
+    table = [{"position": i, "id": finger, "endpoint": address}
              for i, (finger, address) in enumerate(zip(fingers, addresses)) if finger and address]
     return {"name": node.get_name(), "id": node.get_id(), "fingers": table}
 

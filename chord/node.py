@@ -108,9 +108,6 @@ class RoutingInfo:
     def get_address(self):
         return self.address
 
-    def to_dict(self):
-        return vars(self)
-
     def __str__(self):
         return f'RoutingInfo: digest: {self.digest}, parent_digest: {self.parent_digest}, address: {self.address}'
 
@@ -217,12 +214,12 @@ class Node:
         cmd.return_data = index
         cmd.search_digest = digest
 
-        pair.send(Command.FIND_SUCCESSOR, zmq.SNDMORE)
-        pair.send_json(cmd.to_dict())
+        pair.send_pyobj(cmd)
 
-        recv_cmd = pair.recv()
-        found = pair.recv_json()
-        return recv_cmd, found
+        success = pair.recv_pyobj()
+        if not success:
+            logging.error(f'Node {initiator.get_parent()} unable to update finger {index} '
+                          f'on virtual node {initiator.get_digest()}')
 
     def join(self, known_id, known_address):
         logging.debug(f'Node {self.digest_id} at {self.internal_endpoint} joining '
@@ -238,19 +235,15 @@ class Node:
     def join_vnode(self, known_id: int, known_address: str, virtual_node: VirtualNode):
         recipient = RoutingInfo(known_id, known_id, known_address)
         cmd = FindSuccessorCommand(search_digest=virtual_node.get_digest(),
-                                   initiator=virtual_node.routing_info.to_dict(),
-                                   recipient=recipient.to_dict())
-        logging.debug(f'Virtual node {virtual_node.get_digest()} is sending command: {cmd.to_dict()}')
-        self.route_result(known_address, known_id, Command.FIND_SUCCESSOR, cmd.to_dict())
+                                   initiator=virtual_node.routing_info,
+                                   recipient=recipient)
+        logging.debug(f'Virtual node {virtual_node.get_digest()} is sending command: {cmd}')
+        self.route_result(known_address, known_id, cmd)
 
         # Block waiting for result. We can't start execution without know our successor
         # Because loop has not started, we can wait for the message here
-        cmd_id = self.receiver.recv()
-        result = self.receiver.recv_json()
-        logging.debug(f'Virtual node {virtual_node.get_digest()} received response: {result}')
-
-        result_cmd = FindSuccessorCommand(**result)
-        virtual_node.successor = result_cmd.recipient
+        result = self.receiver.recv_pyobj()
+        virtual_node.successor = result.recipient
 
         # If the found successor has the same id as we do, there is already
         # a node the same value in the network and we cannot join with that id
@@ -284,23 +277,22 @@ class Node:
 
     @staticmethod
     def _get_predecessor(pair, v_node):
-        cmd = PredecessorCommand(v_node, 0)
-        pair.send(Command.GET_SUCCESSOR_PREDECESSOR, zmq.SNDMORE)
-        pair.send_json(cmd.to_dict())
+        cmd = PredecessorCommand(initiator=v_node.routing_info)
+        pair.send_pyobj(cmd)
 
         # While we don't use the results received, it is important to acknowledge that the successor
         # has been updated before continuing with the stabilization protocol because the next step
         # involves notifying the new successor of the current nodes existence. If we don't wait for this
         # acknowledgement, we may end up notifying the old successor
-        cmd_id = pair.recv()
-        message = pair.recv_json()
-        return cmd_id, message
+        success = pair.recv_pyobj()
+        if not success:
+            logging.warning(f'Node {v_node.get_parent()} unable to update successor for '
+                            f'virtual node {v_node.get_digest()}')
 
     @staticmethod
     def _notify_successor(pair, v_node):
-        cmd = NotifyCommand(v_node)
-        pair.send(Command.NOTIFY, zmq.SNDMORE)
-        pair.send_json(cmd.to_dict())
+        cmd = NotifyCommand(initiator=v_node.routing_info)
+        pair.send_pyobj(cmd)
 
         # Note that other synchronization processes (updating successor, fixing fingers) wait for a response.
         # Those protocols require information to be sent back to the initiating node for processing. Once that
@@ -357,39 +349,35 @@ class Node:
     def process_input(self, socks, stability, fix_fingers):
         logging.debug(f'Node {self.digest_id} processing {len(socks)} messages')
         for sock in socks:
-            # Receive the message
-            cmd = sock.recv()
-            if cmd == Command.EXIT:
+
+            # Receive command object
+            command = sock.recv_pyobj()
+            logging.debug(f'Node {self.digest_id} received command {command}')
+
+            if command == EXIT_COMMAND:
                 logging.debug(f'Node {self.digest_id} received EXIT message. Node shutting down.')
+                # TODO send exit message to pair sockets
                 return True
 
-            message = sock.recv_json()
-            logging.debug(f'Node {self.digest_id} received {cmd} message {message}')
-
-            # Process the message
-            command = parsers[cmd](**message)
+            # Process the command
             result = command.execute(self)
 
             # Process results
             if result:
-                address = result[0]
-                identity = result[1]
-                next_cmd = result[2]
-                parameters = result[3]
+                address = result.get_address()
+                identity = result.get_parent()
 
                 if address == self.stabilize_address and not identity:
-                    stability.send(next_cmd, zmq.SNDMORE)
-                    stability.send_json(parameters)
+                    stability.send_pyobj(True)
                 elif address == self.fix_fingers_address and not identity:
-                    fix_fingers.send(next_cmd, zmq.SNDMORE)
-                    fix_fingers.send_json(parameters)
+                    fix_fingers.send_pyobj(True)
                 else:
-                    self.route_result(address, identity, next_cmd, parameters)
+                    self.route_result(address, identity, command)
 
             return False
 
-    def route_result(self, address, identity, next_cmd, parameters):
-        logging.debug(f'Node {self.digest_id} sending {next_cmd} with {parameters} to node {identity} at {address}')
+    def route_result(self, address, identity, command):
+        logging.debug(f'Node {self.digest_id} sending {command} to node {identity} at {address}')
         if address not in self.connected:
             self.connected.add(address)
             self.router.connect(address)
@@ -397,8 +385,7 @@ class Node:
 
         identity_b = struct.pack('i', identity)
         self.router.send(identity_b, zmq.SNDMORE)
-        self.router.send(next_cmd, zmq.SNDMORE)
-        self.router.send_json(parameters)
+        self.router.send_pyobj(command)
 
 
 class ChordNode(Node):
@@ -412,69 +399,66 @@ class ChordNode(Node):
 
 
 class Command:
-    FIND_SUCCESSOR = b'FIND_SUCCESSOR'
-    GET_SUCCESSOR_PREDECESSOR = b'GET_PREDECESSOR'
-    NOTIFY = b'NOTIFY'
-    EXIT = b'EXIT'
 
     def execute(self, node):
         pass
 
-    def to_dict(self):
-        data = {}
-        for attr, value in vars(self).items():
-            if type(value) is RoutingInfo:
-                data[attr] = vars(value)
-            else:
-                data[attr] = value
-        return data
+
+class ExitCommand(Command):
+    """ Command to signal the server to shutdown"""
+
+    def __init__(self):
+        pass
+
+    def execute(self, node):
+        # TODO exit command can notify successor and predecessor that it is shutting down
+        pass
+
+    def __eq__(self, other):
+        return type(other) == ExitCommand
 
 
 class NotifyCommand(Command):
 
-    def __init__(self, *args, initiator={}, recipient={}):
-        if args:
-            self.initiator = args[0].routing_info
-            self.recipient = args[0].successor
-        else:
-            self.initiator = RoutingInfo(**initiator)
-            self.recipient = RoutingInfo(**recipient)
+    def __init__(self, initiator=None, recipient=None):
+        self.initiator = initiator
+        self.recipient = recipient
 
     def execute(self, node):
-        if self.recipient.digest in node.virtual_nodes:
+        if not self.recipient and self.initiator.digest in node.virtual_nodes:
+            self.recipient = node.virtual_nodes[self.initiator.digest].successor
+            return self.recipient
+        elif self.recipient.digest in node.virtual_nodes:
             node.virtual_nodes[self.recipient.digest].notify(self.initiator)
         else:
-            self.recipient = node.virtual_nodes[self.initiator.digest].successor
-            return self.recipient.address, self.recipient.parent_digest, Command.NOTIFY, self.to_dict()
+            logging.error(f'Node {node.digest_id} unable to execute {self}')
 
 
 class PredecessorCommand(Command):
 
-    def __init__(self, *args, initiator={}, recipient={}, successors_predecessor={}, step=0):
-        if args:
-            self.initiator = args[0].routing_info
-            self.recipient = args[0].successor
-            self.successors_predecessor = RoutingInfo()
-            self.step = args[1]
-        else:
-            self.initiator = RoutingInfo(**initiator)
-            self.recipient = RoutingInfo(**recipient)
-            self.successors_predecessor = RoutingInfo(**successors_predecessor)
-            self.step = step
+    def __init__(self, initiator=None, recipient=None, successors_predecessor=None):
+        self.initiator = initiator
+        self.recipient = recipient
+        self.successors_predecessor = successors_predecessor
 
     def execute(self, node):
-        if self.step == 0:
-            # Send to successor
-            self.step += 1
-            return self.recipient.address, self.recipient.parent_digest, Command.GET_SUCCESSOR_PREDECESSOR, self.to_dict()
-        elif not self.successors_predecessor.digest:
+        if not self.recipient and \
+                not self.successors_predecessor and \
+                self.initiator.digest in node.virtual_nodes:
+            # Set the recipient
+            self.recipient = node.virtual_nodes[self.initiator.digest].successor
+            return self.recipient
+        elif not self.successors_predecessor and \
+                self.recipient.digest in node.virtual_nodes:
             # Return to initiator
             self.successors_predecessor = node.virtual_nodes[self.recipient.digest].predecessor
-            return self.initiator.address, self.initiator.parent_digest, Command.GET_SUCCESSOR_PREDECESSOR, self.to_dict()
-        else:
+            return self.initiator
+        elif self.initiator.digest in node.virtual_nodes:
             # Initiator updates successor
             node.virtual_nodes[self.initiator.digest].update_successor(self.successors_predecessor)
-            return node.stabilize_address, None, Command.GET_SUCCESSOR_PREDECESSOR, self.to_dict()
+            return RoutingInfo(address=node.stabilize_address)
+        else:
+            logging.error(f'Node {node.digest_id} unable to execute {self}')
 
 
 class FindSuccessorCommand(Command):
@@ -484,10 +468,10 @@ class FindSuccessorCommand(Command):
     # set initiator parent digest and address to client id and address
     #   do not set initiator digest
 
-    def __init__(self, initiator={}, recipient={}, hops=0, found=False,
+    def __init__(self, initiator=None, recipient=None, hops=0, found=False,
                  search_digest=None, return_data=None):
-        self.initiator = RoutingInfo(**initiator)
-        self.recipient = RoutingInfo(**recipient)
+        self.initiator = initiator
+        self.recipient = recipient
 
         self.hops = hops
         self.found = found
@@ -496,38 +480,41 @@ class FindSuccessorCommand(Command):
         self.return_data = return_data
 
     def execute(self, node):
-        logging.debug(f'Node {node.digest_id} executing command: {self.to_dict()}')
+        logging.debug(f'Node {node.digest_id} executing command: {vars(self)}')
 
         if self.found:
             if not self.initiator.digest:
                 return self.client_response()
-            else:
-                logging.debug(f'Node {node.digest_id} received response')
-
-                # If the current node is the initiator, then it has received its response and must
-                # process/store the information appropriately
-                v_node = node.get_virtual_node(self.initiator.digest)
-                index = self.return_data
-                v_node.fingers[index] = self.recipient
-                node.router.connect(self.recipient.address)
-                node.connected.add(self.recipient.address)
-                return node.fix_fingers_address, None, Command.FIND_SUCCESSOR, self.to_dict()
-        else:
-            v_node = node.get_virtual_node(self.recipient.digest)
+            elif self.initiator.digest in node.virtual_nodes:
+                return self.update_node(node)
+        elif self.recipient.digest in node.virtual_nodes:
+            v_node = node.virtual_nodes[self.recipient.digest]
             self.found, self.recipient, self.hops = v_node.find_successor(self.search_digest, self.hops)
             return self.forward_result()
+        else:
+            logging.error(f'Node {node.digest_id} unable to execute {self}')
 
     def client_response(self):
-        # if return_data has value put
-        # else get
+        # if return_data has value `put`
+        # else `get`
         message = None
-        return self.initiator.address, self.initiator.parent_digest, Command.FIND_SUCCESSOR, message
+        return self.initiator
+
+    def update_node(self, node):
+        # If the current node is the initiator, then it has received its response and must
+        # process/store the information appropriately
+        v_node = node.virtual_nodes[self.initiator.digest]
+        index = self.return_data
+        v_node.fingers[index] = self.recipient
+        node.router.connect(self.recipient.address)
+        node.connected.add(self.recipient.address)
+        return RoutingInfo(address=node.fix_fingers_address)
 
     def forward_result(self):
         if self.found and self.initiator.digest:
             # If successor is found and the initiator has a digest set, the result
             # is sent to another node in the network
-            return self.initiator.address, self.initiator.parent_digest, Command.FIND_SUCCESSOR, self.to_dict()
+            return self.initiator
         else:
             # If the successor is found and the initiator does not have a digest set,
             # we have a client request. This result needs to be forwarded to the found successor
@@ -535,24 +522,10 @@ class FindSuccessorCommand(Command):
             #
             # If the successor is not found, the search for the successor is forwarded to the result
             # found on this node
-            return self.recipient.address, self.recipient.parent_digest, Command.FIND_SUCCESSOR, self.to_dict()
+            return self.recipient
 
 
-# def to_dict(obj):
-#     data = {}
-#     for key, value in vars(object).items():
-#         try:
-#             data[key] = to_dict(value)
-#         except AttributeError:
-#             data[key] = value
-#
-#     logging.debug(f'to_dict() output: {data}')
-#     return data
-
-
-parsers = {Command.FIND_SUCCESSOR: FindSuccessorCommand,
-           Command.GET_SUCCESSOR_PREDECESSOR: PredecessorCommand,
-           Command.NOTIFY: NotifyCommand}
+EXIT_COMMAND = ExitCommand()
 
 
 # -----------------------------------------------------------------------------
@@ -587,9 +560,9 @@ def handle_shutdown(name, address, internal_port):
 
         identity = struct.pack('i', digest)
         shutdown_socket.send(identity, zmq.SNDMORE)
-        shutdown_socket.send(Command.EXIT)
+        shutdown_socket.send_pyobj(EXIT_COMMAND)
     finally:
-        shutdown_socket.disconnect(endpoint)
+        shutdown_socket.close()
         context.destroy()
 
 

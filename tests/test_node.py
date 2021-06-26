@@ -26,10 +26,8 @@ def test_init_fingers(mock_zmq):
     node = Node('node_0', 160, 'tcp://127.0.0.1')
 
     pair = Mock()
-    pair.send.return_value = None
-    pair.send_json.return_value = None
-    pair.recv.return_value = Command.FIND_SUCCESSOR
-    pair.recv_json.return_value = {'successor': 163, 'address': 'tcp://127.0.0.1:5555'}
+    pair.send_pyobj.return_value = None
+    pair.recv_pyobj.return_value = {'successor': 163, 'address': 'tcp://127.0.0.1:5555'}
 
     node._init_fingers(pair)
     assert node.virtual_nodes[160].fingers == [None] * NUM_BITS

@@ -19,9 +19,114 @@ from hash import NUM_BITS, hash_value
 # -----------------------------------------------------------------------------
 
 
+class VirtualNode:
+
+    def __init__(self, name, digest, parent_digest, endpoint):
+        self.name = name
+        self.routing_info = RoutingInfo(digest, parent_digest, endpoint)
+        self.successor = self.routing_info
+        self.predecessor = self.routing_info
+        self.fingers = [None] * NUM_BITS
+
+    def get_digest(self):
+        return self.routing_info.get_digest()
+
+    def get_parent(self):
+        return self.routing_info.get_parent()
+
+    def get_address(self):
+        return self.routing_info.get_address()
+
+    def find_successor(self, digest, hops):
+        if digest == self.routing_info.digest:
+            return True, self.routing_info, hops
+
+        logging.debug(f"    Is id {digest} contained in ({self.get_digest()}, {self.successor.get_digest()}]?")
+        if open_closed(self.get_digest(), self.successor.get_digest(), digest):
+
+            # We have found the successor and will return it to the requester
+            logging.debug(f"      Yes, returning successor {self.successor.get_digest()} hops: {hops}")
+            return True, self.successor, hops + 1
+        else:
+
+            # We have not found the successor of the digest. Return the next node
+            # to advance to. For the naive nodes, this is also the successor. For
+            # chord nodes, this is either a node from the finger table or the successor
+            logging.debug(f"      No, finding closest preceding node")
+            next_node = self.find_next_node(digest)
+            return False, next_node, hops + 1
+
+    def find_next_node(self, digest):
+        return self.successor
+
+    def notify(self, other):
+        logging.debug(f'Node {self.routing_info.digest} notified by node {other.digest}')
+        if not self.predecessor \
+                or open_open(self.predecessor.digest, self.routing_info.digest, other.digest):
+            logging.debug(f'Node {self.routing_info.digest} updating predecessor')
+            self.predecessor = other
+
+    def update_successor(self, other):
+        if other.digest and \
+                open_open(self.routing_info.digest, self.successor.digest, other.digest):
+            self.successor = other
+
+
+class ChordVirtualNode(VirtualNode):
+
+    def find_next_node(self, digest):
+        return self.closest_preceding_node(digest)
+
+    def closest_preceding_node(self, digest):
+
+        for finger in reversed(self.fingers):
+            if not finger:
+                continue
+
+            logging.debug(f"      Is {finger.digest} in ({self.routing_info.digest, digest})?")
+            if open_open(self.routing_info.digest, digest, finger.digest):
+                logging.debug(f"        Yes, returning finger {finger.digest}")
+                return finger
+
+        logging.debug(f"      Finger not found. Returning successor {self.successor.digest}")
+        return self.successor
+
+
+class RoutingInfo:
+
+    def __init__(self, digest=None, parent_digest=None, address=None):
+        self.digest = digest
+        self.parent_digest = parent_digest
+        self.address = address
+
+    def get_digest(self):
+        return self.digest
+
+    def get_parent(self):
+        return self.parent_digest
+
+    def get_address(self):
+        return self.address
+
+    def to_dict(self):
+        return vars(self)
+
+    def __str__(self):
+        return f'RoutingInfo: digest: {self.digest}, parent_digest: {self.parent_digest}, address: {self.address}'
+
+    def __repr__(self):
+        return f'RoutingInfo: {vars(self)}'
+
+    def __eq__(self, other):
+        return other and \
+               self.digest == other.digest and \
+               self.parent_digest == other.parent_digest and \
+               self.address == other.address
+
+
 class Node:
 
-    def __init__(self, node_name, node_id, address, external_port=None, internal_port=None):
+    def __init__(self, node_name, node_id, address, external_port=None, internal_port=None, virtual={}):
         endpoint_fmt = '{0}:{1}'
 
         # Node identification
@@ -56,109 +161,29 @@ class Node:
         self.connected = set()
         self.shutdown = False
 
-        # Pointers to network nodes
-        self.successor = self.digest_id
-        self.successor_address = self.internal_endpoint
-        self.predecessor = self.digest_id
-        self.predecessor_address = self.internal_endpoint
-        self.fingers = [None] * NUM_BITS
-        self.finger_addresses = [None] * NUM_BITS
+        self.virtual_nodes = self.create_virtual_nodes(virtual)
+
+    def create_virtual_nodes(self, virtual):
+        virtual_node_type = self.get_virtual_node_type()
+
+        virtual_nodes = {digest: virtual_node_type(name, digest, self.digest_id, self.internal_endpoint)
+                         for name, digest in virtual.items()}
+        virtual_nodes[self.digest_id] = virtual_node_type(self.name, self.digest_id, self.digest_id, self.internal_endpoint)
+
+        return virtual_nodes
+
+    @staticmethod
+    def get_virtual_node_type():
+        return VirtualNode
 
     def get_name(self):
         return self.name
 
-    def get_successor(self):
-        return self.successor
-
     def get_id(self):
         return self.digest_id
 
-    def set_successor(self, successor):
-        self.successor = successor
-
-    def _init_fingers(self, pair):
-        logging.debug(f"Building finger table for {self.name} (Digest: {self.digest_id})")
-
-        i = 0
-        next_key = (self.digest_id + pow(2, i)) % (pow(2, NUM_BITS) - 1)
-        while i < NUM_BITS:
-            self._find_successor(pair, next_key, i)
-            logging.debug(f"  Found finger {i} is successor({next_key}) = {self.fingers[i]}")
-
-            i += 1
-            next_key = (self.digest_id + pow(2, i)) % (pow(2, NUM_BITS) - 1)
-
-    def _find_successor(self, pair, digest, index):
-        cmd = FindSuccessorCommand()
-        cmd.return_id = self.digest_id
-        cmd.return_address = self.internal_endpoint
-        cmd.return_type = FindSuccessorCommand.RETURN_TYPE_NODE
-        cmd.return_data = index
-        cmd.digest = digest
-
-        pair.send(Command.FIND_SUCCESSOR, zmq.SNDMORE)
-        pair.send_json(vars(cmd))
-
-        recv_cmd = pair.recv()
-        found = pair.recv_json()
-        return recv_cmd, found
-
-    def find_successor(self, digest, hops):
-        if digest == self.digest_id:
-            return True, self.digest_id, self.internal_endpoint, hops
-
-        logging.debug(f"    Is id {digest} contained in ({self.digest_id}, {self.successor}]?")
-        if open_closed(self.digest_id, self.successor, digest):
-
-            # We have found the successor and will return it to the requester
-            logging.debug(f"      Yes, returning successor {self.successor} hops: {hops}")
-            return True, self.successor, self.successor_address, hops + 1
-        else:
-
-            # We have not found the successor of the digest. Return the next node
-            # to advance to. For the naive nodes, this is also the successor. For
-            # chord nodes, this is either a node from the finger table or the successor
-            logging.debug(f"      No, finding closest preceding node")
-            next_node, next_address = self.find_next_node(digest)
-            return False, next_node, next_address, hops + 1
-
-    def find_next_node(self, digest):
-        return self.successor, self.successor_address
-
-    def join(self, known_id, known_address):
-        logging.debug(f'Node {self.digest_id} at {self.internal_endpoint} joining '
-                      f'known node {known_id} at {known_address}')
-
-        params = {'digest': self.digest_id,
-                  'return_id': self.digest_id,
-                  'return_address': self.internal_endpoint}
-        self.route_result(known_address, known_id, Command.FIND_SUCCESSOR, params)
-
-        # Block waiting for result. We can't start execution without know our successor
-        # Because loop has not started, we can wait for the message here
-        cmd = self.receiver.recv()
-        result = self.receiver.recv_json()
-
-        found_successor = FindSuccessorCommand.parse(result)
-        self.successor = found_successor.successor
-        self.successor_address = found_successor.address
-
-        # If the found successor has the same id as we do, there is already
-        # a node the same value in the network and we cannot join with that id
-        if self.successor == self.digest_id:
-            self.context.destroy()
-            return False
-
-        logging.debug(f'Node {self.digest_id} initialized successor {self.successor} at {self.successor_address}')
-        return True
-
-    def notify(self, other, other_address):
-        logging.debug(f'Node {self.digest_id} notified by node {other}')
-        if not self.predecessor \
-                or open_open(self.predecessor, self.digest_id, other):
-            logging.debug(f'Node {self.digest_id} updating predecessor')
-            self.predecessor = other
-            self.predecessor_address = other_address
+    def get_virtual_node(self, virtual_node_digest: int) -> VirtualNode:
+        return self.virtual_nodes[virtual_node_digest]
 
     def fix_fingers_loop(self, context, interval):
         pair = context.socket(zmq.PAIR)
@@ -170,6 +195,71 @@ class Node:
                 time.sleep(interval)
         finally:
             pair.close()
+
+    def _init_fingers(self, pair):
+        for v_node in self.virtual_nodes.values():
+            logging.debug(f"Building finger table for {v_node.name} (Digest: {v_node.get_digest()})")
+
+            i = 0
+            next_key = (v_node.get_digest() + pow(2, i)) % (pow(2, NUM_BITS) - 1)
+            while i < NUM_BITS:
+                self._find_successor(pair, next_key, v_node.routing_info, i)
+                logging.debug(f"  Found finger {i} is successor({next_key}) = {v_node.fingers[i]}")
+
+                i += 1
+                next_key = (v_node.get_digest() + pow(2, i)) % (pow(2, NUM_BITS) - 1)
+
+    @staticmethod
+    def _find_successor(pair: zmq.Socket, digest: int, initiator: RoutingInfo, index: int):
+        cmd = FindSuccessorCommand()
+        cmd.initiator = initiator
+        cmd.recipient = initiator
+        cmd.return_data = index
+        cmd.search_digest = digest
+
+        pair.send(Command.FIND_SUCCESSOR, zmq.SNDMORE)
+        pair.send_json(cmd.to_dict())
+
+        recv_cmd = pair.recv()
+        found = pair.recv_json()
+        return recv_cmd, found
+
+    def join(self, known_id, known_address):
+        logging.debug(f'Node {self.digest_id} at {self.internal_endpoint} joining '
+                      f'known node {known_id} at {known_address}')
+
+        for v_node in self.virtual_nodes.values():
+            success = self.join_vnode(known_id, known_address, v_node)
+            if not success:
+                self.virtual_nodes.pop(v_node.get_digest())
+
+        return len(self.virtual_nodes)
+
+    def join_vnode(self, known_id: int, known_address: str, virtual_node: VirtualNode):
+        recipient = RoutingInfo(known_id, known_id, known_address)
+        cmd = FindSuccessorCommand(search_digest=virtual_node.get_digest(),
+                                   initiator=virtual_node.routing_info.to_dict(),
+                                   recipient=recipient.to_dict())
+        logging.debug(f'Virtual node {virtual_node.get_digest()} is sending command: {cmd.to_dict()}')
+        self.route_result(known_address, known_id, Command.FIND_SUCCESSOR, cmd.to_dict())
+
+        # Block waiting for result. We can't start execution without know our successor
+        # Because loop has not started, we can wait for the message here
+        cmd_id = self.receiver.recv()
+        result = self.receiver.recv_json()
+        logging.debug(f'Virtual node {virtual_node.get_digest()} received response: {result}')
+
+        result_cmd = FindSuccessorCommand(**result)
+        virtual_node.successor = result_cmd.recipient
+
+        # If the found successor has the same id as we do, there is already
+        # a node the same value in the network and we cannot join with that id
+        if virtual_node.successor.get_digest() == virtual_node.get_digest():
+            return False
+
+        logging.debug(f'Node {virtual_node.get_digest()} initialized successor '
+                      f'{virtual_node.successor.get_digest()} at {virtual_node.successor.get_address()}')
+        return True
 
     def stabilize_loop(self, context, interval):
         pair = context.socket(zmq.PAIR)
@@ -185,26 +275,39 @@ class Node:
     def _stabilize(self, pair):
         logging.debug(f'Node {self.digest_id} running stabilize')
 
-        self._get_predecessor(pair)
+        for v_node in self.virtual_nodes.values():
+            logging.debug(f'Node {v_node.get_digest()} updating successor {v_node.successor.get_digest()}')
+            self._get_predecessor(pair, v_node)
 
-        logging.debug(f'Node {self.digest_id} notifying successor {self.successor}')
-        self._notify_successor(pair)
-
-    @staticmethod
-    def _notify_successor(pair):
-        notify_cmd = vars(NotifyCommand())
-        pair.send(Command.NOTIFY, zmq.SNDMORE)
-        pair.send_json(notify_cmd)
+            logging.debug(f'Node {v_node.get_digest()} notifying successor {v_node.successor.get_digest()}')
+            self._notify_successor(pair, v_node)
 
     @staticmethod
-    def _get_predecessor(pair):
-        predecessor_cmd = vars(PredecessorCommand())
+    def _get_predecessor(pair, v_node):
+        cmd = PredecessorCommand(v_node, 0)
         pair.send(Command.GET_SUCCESSOR_PREDECESSOR, zmq.SNDMORE)
-        pair.send_json(predecessor_cmd)
+        pair.send_json(cmd.to_dict())
 
+        # While we don't use the results received, it is important to acknowledge that the successor
+        # has been updated before continuing with the stabilization protocol because the next step
+        # involves notifying the new successor of the current nodes existence. If we don't wait for this
+        # acknowledgement, we may end up notifying the old successor
         cmd_id = pair.recv()
         message = pair.recv_json()
         return cmd_id, message
+
+    @staticmethod
+    def _notify_successor(pair, v_node):
+        cmd = NotifyCommand(v_node)
+        pair.send(Command.NOTIFY, zmq.SNDMORE)
+        pair.send_json(cmd.to_dict())
+
+        # Note that other synchronization processes (updating successor, fixing fingers) wait for a response.
+        # Those protocols require information to be sent back to the initiating node for processing. Once that
+        # processing is done, the node sends a message to the thread the task is complete and the task movies on.
+        # In other words, those are processed synchronously. Notify is different from the other synchronization
+        # processes because it does not send information back to the initiating node. We make notify asynchronous
+        # because we don't want to add network traffic just for the purpose of being synchronous.
 
     def run(self, stabilize_interval=5, fix_fingers_interval=7):
         logging.info(f'Starting loop for node {self.digest_id}')
@@ -245,6 +348,7 @@ class Node:
             logging.info(finger_table_links(self))
 
         finally:
+            logging.debug(f'Node {self.digest_id} destroying context...')
             self.context.destroy()
             self.shutdown = True
 
@@ -263,7 +367,7 @@ class Node:
             logging.debug(f'Node {self.digest_id} received {cmd} message {message}')
 
             # Process the message
-            command = parsers[cmd](message)
+            command = parsers[cmd](**message)
             result = command.execute(self)
 
             # Process results
@@ -299,25 +403,12 @@ class Node:
 
 class ChordNode(Node):
 
-    def __init__(self, node_name, node_id, address, external_port=None, internal_port=None):
-        super().__init__(node_name, node_id, address, external_port, internal_port)
+    def __init__(self, node_name, node_id, address, external_port=None, internal_port=None, virtual={}):
+        super().__init__(node_name, node_id, address, external_port, internal_port, virtual)
 
-    def find_next_node(self, digest):
-        return self.closest_preceding_node(digest)
-
-    def closest_preceding_node(self, digest):
-
-        for finger, address in zip(reversed(self.fingers), reversed(self.finger_addresses)):
-            if not finger:
-                continue
-
-            logging.debug(f"      Is {finger} in ({self.digest_id, digest})?")
-            if open_open(self.digest_id, digest, finger):
-                logging.debug(f"        Yes, returning finger {finger}")
-                return finger, address
-
-        logging.debug(f"      Finger not found. Returning successor {self.successor}")
-        return self.successor, self.successor_address
+    @staticmethod
+    def get_virtual_node_type():
+        return ChordVirtualNode
 
 
 class Command:
@@ -329,103 +420,139 @@ class Command:
     def execute(self, node):
         pass
 
-    @staticmethod
-    def parse(cmd, parameters):
-        for key in parameters:
-            setattr(cmd, key, parameters[key])
-        return cmd
+    def to_dict(self):
+        data = {}
+        for attr, value in vars(self).items():
+            if type(value) is RoutingInfo:
+                data[attr] = vars(value)
+            else:
+                data[attr] = value
+        return data
 
 
 class NotifyCommand(Command):
 
-    def __init__(self):
-        self.initiator_id = None
-        self.initiator_address = None
+    def __init__(self, *args, initiator={}, recipient={}):
+        if args:
+            self.initiator = args[0].routing_info
+            self.recipient = args[0].successor
+        else:
+            self.initiator = RoutingInfo(**initiator)
+            self.recipient = RoutingInfo(**recipient)
 
     def execute(self, node):
-        if not self.initiator_id and not self.initiator_address:
-            self.initiator_id = node.digest_id
-            self.initiator_address = node.internal_endpoint
-            return node.successor_address, node.successor, Command.NOTIFY, vars(self)
+        if self.recipient.digest in node.virtual_nodes:
+            node.virtual_nodes[self.recipient.digest].notify(self.initiator)
         else:
-            node.notify(self.initiator_id, self.initiator_address)
-
-    @staticmethod
-    def parse(parameters):
-        cmd = NotifyCommand()
-        return Command.parse(cmd, parameters)
+            self.recipient = node.virtual_nodes[self.initiator.digest].successor
+            return self.recipient.address, self.recipient.parent_digest, Command.NOTIFY, self.to_dict()
 
 
 class PredecessorCommand(Command):
 
-    def __init__(self):
-        self.return_id = None
-        self.return_address = None
-        self.succ_pred = None
-        self.succ_pred_address = None
+    def __init__(self, *args, initiator={}, recipient={}, successors_predecessor={}, step=0):
+        if args:
+            self.initiator = args[0].routing_info
+            self.recipient = args[0].successor
+            self.successors_predecessor = RoutingInfo()
+            self.step = args[1]
+        else:
+            self.initiator = RoutingInfo(**initiator)
+            self.recipient = RoutingInfo(**recipient)
+            self.successors_predecessor = RoutingInfo(**successors_predecessor)
+            self.step = step
 
     def execute(self, node):
-        if not self.return_id and not self.return_address:
-            self.return_id = node.digest_id
-            self.return_address = node.internal_endpoint
-            return node.successor_address, node.successor, Command.GET_SUCCESSOR_PREDECESSOR, vars(self)
-        elif not self.succ_pred:
-            self.succ_pred = node.predecessor
-            self.succ_pred_address = node.predecessor_address
-            return self.return_address, self.return_id, Command.GET_SUCCESSOR_PREDECESSOR, vars(self)
+        if self.step == 0:
+            # Send to successor
+            self.step += 1
+            return self.recipient.address, self.recipient.parent_digest, Command.GET_SUCCESSOR_PREDECESSOR, self.to_dict()
+        elif not self.successors_predecessor.digest:
+            # Return to initiator
+            self.successors_predecessor = node.virtual_nodes[self.recipient.digest].predecessor
+            return self.initiator.address, self.initiator.parent_digest, Command.GET_SUCCESSOR_PREDECESSOR, self.to_dict()
         else:
-            if self.succ_pred and \
-                    open_open(node.digest_id, node.successor, self.succ_pred):
-                node.successor = self.succ_pred
-                node.successor_address = self.succ_pred_address
-            return node.stabilize_address, None, Command.GET_SUCCESSOR_PREDECESSOR, vars(self)
-
-    @staticmethod
-    def parse(parameters):
-        cmd = PredecessorCommand()
-        return Command.parse(cmd, parameters)
+            # Initiator updates successor
+            node.virtual_nodes[self.initiator.digest].update_successor(self.successors_predecessor)
+            return node.stabilize_address, None, Command.GET_SUCCESSOR_PREDECESSOR, self.to_dict()
 
 
 class FindSuccessorCommand(Command):
-    RETURN_TYPE_NODE = 0
-    RETURN_TYPE_CLIENT = 1
 
-    def __init__(self):
-        self.digest = None
-        self.hops = 0
-        self.return_id = None
-        self.return_address = None
-        self.return_type = None
-        self.return_data = None
-        self.found = False
-        self.successor = None
-        self.address = None
+    # TODO handle get/put requests from clients
+    # set recipient to receiving node so it calls find_successor first
+    # set initiator parent digest and address to client id and address
+    #   do not set initiator digest
+
+    def __init__(self, initiator={}, recipient={}, hops=0, found=False,
+                 search_digest=None, return_data=None):
+        self.initiator = RoutingInfo(**initiator)
+        self.recipient = RoutingInfo(**recipient)
+
+        self.hops = hops
+        self.found = found
+
+        self.search_digest = search_digest
+        self.return_data = return_data
 
     def execute(self, node):
+        logging.debug(f'Node {node.digest_id} executing command: {self.to_dict()}')
+
         if self.found:
-            if self.return_type == self.RETURN_TYPE_NODE:
-                node.fingers[self.return_data] = self.successor
-                node.finger_addresses[self.return_data] = self.address
-                node.router.connect(self.address)
-                node.connected.add(self.address)
-                return node.fix_fingers_address, None, Command.FIND_SUCCESSOR, vars(self)
-            elif self.return_type == self.RETURN_TYPE_CLIENT:
-                pass
+            if not self.initiator.digest:
+                return self.client_response()
+            else:
+                logging.debug(f'Node {node.digest_id} received response')
+
+                # If the current node is the initiator, then it has received its response and must
+                # process/store the information appropriately
+                v_node = node.get_virtual_node(self.initiator.digest)
+                index = self.return_data
+                v_node.fingers[index] = self.recipient
+                node.router.connect(self.recipient.address)
+                node.connected.add(self.recipient.address)
+                return node.fix_fingers_address, None, Command.FIND_SUCCESSOR, self.to_dict()
         else:
-            self.found, self.successor, self.address, self.hops = node.find_successor(self.digest, self.hops)
-            if self.found:
-                return self.return_address, self.return_id, Command.FIND_SUCCESSOR, vars(self)
-            return self.address, self.successor, Command.FIND_SUCCESSOR, vars(self)
+            v_node = node.get_virtual_node(self.recipient.digest)
+            self.found, self.recipient, self.hops = v_node.find_successor(self.search_digest, self.hops)
+            return self.forward_result()
 
-    @staticmethod
-    def parse(parameters):
-        cmd = FindSuccessorCommand()
-        return Command.parse(cmd, parameters)
+    def client_response(self):
+        # if return_data has value put
+        # else get
+        message = None
+        return self.initiator.address, self.initiator.parent_digest, Command.FIND_SUCCESSOR, message
+
+    def forward_result(self):
+        if self.found and self.initiator.digest:
+            # If successor is found and the initiator has a digest set, the result
+            # is sent to another node in the network
+            return self.initiator.address, self.initiator.parent_digest, Command.FIND_SUCCESSOR, self.to_dict()
+        else:
+            # If the successor is found and the initiator does not have a digest set,
+            # we have a client request. This result needs to be forwarded to the found successor
+            # which will handle the response to the client
+            #
+            # If the successor is not found, the search for the successor is forwarded to the result
+            # found on this node
+            return self.recipient.address, self.recipient.parent_digest, Command.FIND_SUCCESSOR, self.to_dict()
 
 
-parsers = {Command.FIND_SUCCESSOR: FindSuccessorCommand.parse,
-           Command.GET_SUCCESSOR_PREDECESSOR: PredecessorCommand.parse,
-           Command.NOTIFY: NotifyCommand.parse}
+# def to_dict(obj):
+#     data = {}
+#     for key, value in vars(object).items():
+#         try:
+#             data[key] = to_dict(value)
+#         except AttributeError:
+#             data[key] = value
+#
+#     logging.debug(f'to_dict() output: {data}')
+#     return data
+
+
+parsers = {Command.FIND_SUCCESSOR: FindSuccessorCommand,
+           Command.GET_SUCCESSOR_PREDECESSOR: PredecessorCommand,
+           Command.NOTIFY: NotifyCommand}
 
 
 # -----------------------------------------------------------------------------

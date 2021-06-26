@@ -5,7 +5,7 @@ import time
 import zmq
 
 from chord.hash import hash_value, NUM_BITS
-from chord.node import Node
+from chord.node import Node, RoutingInfo
 
 
 def test_join():
@@ -21,22 +21,19 @@ def test_join():
     node1_t.start()
 
     joined = node2.join(node1.digest_id, node1.internal_endpoint)
-    assert joined
+    assert joined == 1
+
+    v_node1 = node1.virtual_nodes[digest1]
+    v_node2 = node2.virtual_nodes[digest2]
 
     logging.info('Test join')
-    assert node1.fingers == [None] * NUM_BITS
-    assert node1.finger_addresses == [None] * NUM_BITS
-    assert node1.successor == 160
-    assert node1.successor_address == 'tcp://127.0.0.1:5501'
-    assert node1.predecessor == 160
-    assert node1.predecessor_address == 'tcp://127.0.0.1:5501'
+    assert v_node1.fingers == [None] * NUM_BITS
+    assert v_node1.successor == RoutingInfo(160, 160, 'tcp://127.0.0.1:5501')
+    assert v_node1.predecessor == RoutingInfo(160, 160, 'tcp://127.0.0.1:5501')
 
-    assert node2.fingers == [None] * NUM_BITS
-    assert node2.finger_addresses == [None] * NUM_BITS
-    assert node2.successor == 160
-    assert node2.successor_address == 'tcp://127.0.0.1:5501'
-    assert node2.predecessor == 163
-    assert node2.predecessor_address == 'tcp://127.0.0.1:5503'
+    assert v_node2.fingers == [None] * NUM_BITS
+    assert v_node2.successor == RoutingInfo(160, 160, 'tcp://127.0.0.1:5501')
+    assert v_node2.predecessor == RoutingInfo(163, 163, 'tcp://127.0.0.1:5503')
 
     node2_t = threading.Thread(target=node2.run, args=[None, None], daemon=True)
     node2_t.start()
@@ -51,19 +48,11 @@ def test_join():
     time.sleep(.5)
 
     logging.info('Test stabilize node 2')
-    assert node1.fingers == [None] * NUM_BITS
-    assert node1.finger_addresses == [None] * NUM_BITS
-    assert node1.successor == 160
-    assert node1.successor_address == 'tcp://127.0.0.1:5501'
-    assert node1.predecessor == 163
-    assert node1.predecessor_address == 'tcp://127.0.0.1:5503'
+    assert v_node1.successor == RoutingInfo(160, 160, 'tcp://127.0.0.1:5501')
+    assert v_node1.predecessor == RoutingInfo(163, 163, 'tcp://127.0.0.1:5503')
 
-    assert node2.fingers == [None] * NUM_BITS
-    assert node2.finger_addresses == [None] * NUM_BITS
-    assert node2.successor == 160
-    assert node2.successor_address == 'tcp://127.0.0.1:5501'
-    assert node2.predecessor == 163
-    assert node2.predecessor_address == 'tcp://127.0.0.1:5503'
+    assert v_node2.successor == RoutingInfo(160, 160, 'tcp://127.0.0.1:5501')
+    assert v_node2.predecessor == RoutingInfo(163, 163, 'tcp://127.0.0.1:5503')
 
     stabilize_pair1 = node1.context.socket(zmq.PAIR)
     stabilize_pair1.connect(node1.stabilize_address)
@@ -73,20 +62,12 @@ def test_join():
     # so wait until it is likely complete
     time.sleep(.5)
 
-    logging.info('Test stabilize node3')
-    assert node1.fingers == [None] * NUM_BITS
-    assert node1.finger_addresses == [None] * NUM_BITS
-    assert node1.successor == 163
-    assert node1.successor_address == 'tcp://127.0.0.1:5503'
-    assert node1.predecessor == 163
-    assert node1.predecessor_address == 'tcp://127.0.0.1:5503'
+    logging.info('Test stabilize node 1')
+    assert v_node1.successor == RoutingInfo(163, 163, 'tcp://127.0.0.1:5503')
+    assert v_node1.predecessor == RoutingInfo(163, 163, 'tcp://127.0.0.1:5503')
 
-    assert node2.fingers == [None] * NUM_BITS
-    assert node2.finger_addresses == [None] * NUM_BITS
-    assert node2.successor == 160
-    assert node2.successor_address == 'tcp://127.0.0.1:5501'
-    assert node2.predecessor == 160
-    assert node2.predecessor_address == 'tcp://127.0.0.1:5501'
+    assert v_node2.successor == RoutingInfo(160, 160, 'tcp://127.0.0.1:5501')
+    assert v_node2.predecessor == RoutingInfo(160, 160, 'tcp://127.0.0.1:5501')
 
     fix_pair1 = node1.context.socket(zmq.PAIR)
     fix_pair1.connect(node1.fix_fingers_address)
@@ -97,47 +78,35 @@ def test_join():
     node2._init_fingers(fix_pair2)
 
     logging.info('Test final state')
-    assert node1.fingers == [163, 163, 160, 160, 160, 160, 160, 160]
-    assert node1.finger_addresses == ['tcp://127.0.0.1:5503',
-                                      'tcp://127.0.0.1:5503',
-                                      'tcp://127.0.0.1:5501',
-                                      'tcp://127.0.0.1:5501',
-                                      'tcp://127.0.0.1:5501',
-                                      'tcp://127.0.0.1:5501',
-                                      'tcp://127.0.0.1:5501',
-                                      'tcp://127.0.0.1:5501']
-    assert node1.successor == 163
-    assert node1.successor_address == 'tcp://127.0.0.1:5503'
-    assert node1.predecessor == 163
-    assert node1.predecessor_address == 'tcp://127.0.0.1:5503'
+    assert v_node1.fingers == [RoutingInfo(163, 163, 'tcp://127.0.0.1:5503'),
+                               RoutingInfo(163, 163, 'tcp://127.0.0.1:5503'),
+                               RoutingInfo(160, 160, 'tcp://127.0.0.1:5501'),
+                               RoutingInfo(160, 160, 'tcp://127.0.0.1:5501'),
+                               RoutingInfo(160, 160, 'tcp://127.0.0.1:5501'),
+                               RoutingInfo(160, 160, 'tcp://127.0.0.1:5501'),
+                               RoutingInfo(160, 160, 'tcp://127.0.0.1:5501'),
+                               RoutingInfo(160, 160, 'tcp://127.0.0.1:5501')]
 
-    assert node2.fingers == [160, 160, 160, 160, 160, 160, 160, 160]
-    assert node2.finger_addresses == ['tcp://127.0.0.1:5501',
-                                      'tcp://127.0.0.1:5501',
-                                      'tcp://127.0.0.1:5501',
-                                      'tcp://127.0.0.1:5501',
-                                      'tcp://127.0.0.1:5501',
-                                      'tcp://127.0.0.1:5501',
-                                      'tcp://127.0.0.1:5501',
-                                      'tcp://127.0.0.1:5501']
-    assert node2.successor == 160
-    assert node2.successor_address == 'tcp://127.0.0.1:5501'
-    assert node2.predecessor == 160
-    assert node2.predecessor_address == 'tcp://127.0.0.1:5501'
+    assert v_node2.fingers == [RoutingInfo(160, 160, 'tcp://127.0.0.1:5501'),
+                               RoutingInfo(160, 160, 'tcp://127.0.0.1:5501'),
+                               RoutingInfo(160, 160, 'tcp://127.0.0.1:5501'),
+                               RoutingInfo(160, 160, 'tcp://127.0.0.1:5501'),
+                               RoutingInfo(160, 160, 'tcp://127.0.0.1:5501'),
+                               RoutingInfo(160, 160, 'tcp://127.0.0.1:5501'),
+                               RoutingInfo(160, 160, 'tcp://127.0.0.1:5501'),
+                               RoutingInfo(160, 160, 'tcp://127.0.0.1:5501')]
 
     name3 = 'node_2'
     digest3 = hash_value(name3)
     node3 = Node(name3, digest3, 'tcp://127.0.0.1', '5504', '5505')
 
     joined = node3.join(node1.digest_id, node1.internal_endpoint)
-    assert joined
+    assert joined == 1
 
-    assert node3.fingers == [None] * NUM_BITS
-    assert node3.finger_addresses == [None] * NUM_BITS
-    assert node3.successor == 160
-    assert node3.successor_address == 'tcp://127.0.0.1:5501'
-    assert node3.predecessor == 32
-    assert node3.predecessor_address == 'tcp://127.0.0.1:5505'
+    v_node3 = node3.virtual_nodes[digest3]
+    assert v_node3.fingers == [None] * NUM_BITS
+    assert v_node3.successor == RoutingInfo(160, 160, 'tcp://127.0.0.1:5501')
+    assert v_node3.predecessor == RoutingInfo(32, 32, 'tcp://127.0.0.1:5505')
 
     node3_t = threading.Thread(target=node3.run, args=[None, None], daemon=True)
     node3_t.start()
@@ -151,12 +120,12 @@ def test_join():
     # so wait until it is likely complete
     time.sleep(.5)
 
-    assert node1.successor == 163    # final
-    assert node1.predecessor == 32   # final
-    assert node2.successor == 160    # 32
-    assert node2.predecessor == 160  # final
-    assert node3.successor == 160    # final
-    assert node3.predecessor == 32   # 163
+    assert v_node1.successor == RoutingInfo(163, 163, 'tcp://127.0.0.1:5503')
+    assert v_node1.predecessor == RoutingInfo(32, 32, 'tcp://127.0.0.1:5505')
+    assert v_node2.successor == RoutingInfo(160, 160, 'tcp://127.0.0.1:5501')
+    assert v_node2.predecessor == RoutingInfo(160, 160, 'tcp://127.0.0.1:5501')
+    assert v_node3.successor == RoutingInfo(160, 160, 'tcp://127.0.0.1:5501')
+    assert v_node3.predecessor == RoutingInfo(32, 32, 'tcp://127.0.0.1:5505')
 
     logging.info('Calling stabilize')
     node2._stabilize(stabilize_pair2)
@@ -165,9 +134,14 @@ def test_join():
     # so wait until it is likely complete
     time.sleep(.5)
 
-    assert node1.successor == 163
-    assert node1.predecessor == 32
-    assert node2.successor == 32
-    assert node2.predecessor == 160
-    assert node3.successor == 160
-    assert node3.predecessor == 163
+    assert v_node1.successor == RoutingInfo(163, 163, 'tcp://127.0.0.1:5503')
+    assert v_node1.predecessor == RoutingInfo(32, 32, 'tcp://127.0.0.1:5505')
+    assert v_node2.successor == RoutingInfo(32, 32, 'tcp://127.0.0.1:5505')
+    assert v_node2.predecessor == RoutingInfo(160, 160, 'tcp://127.0.0.1:5501')
+    assert v_node3.successor == RoutingInfo(160, 160, 'tcp://127.0.0.1:5501')
+    assert v_node3.predecessor == RoutingInfo(163, 163, 'tcp://127.0.0.1:5503')
+
+
+def test_stabilize():
+    # TODO test stabilize runs on all virtual nodes
+    pass

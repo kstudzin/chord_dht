@@ -55,7 +55,7 @@ def config_parser():
                         help='Number of nodes in network')
 
     # TODO - should be able to have different numbers of virtual nodes on each node
-    parser.add_argument('--virtual-nodes', '-vn', type=int, default=0,
+    parser.add_argument('--nodes-per-host', '-nph', type=int, default=0,
                         help='Number of nodes hosted on a single instance.')
 
     return parser
@@ -70,8 +70,8 @@ def main():
         print(f'Cannot create {num_nodes} nodes in {NUM_BITS}-bit address space', file=sys.stderr)
         exit(1)
 
-    num_virtual = args.virtual_nodes
-    if not num_virtual * num_nodes < pow(2, NUM_BITS):
+    num_virtual = args.nodes_per_host - 1
+    if not ((num_virtual + 1) * num_nodes) < pow(2, NUM_BITS):
         print(f'Cannot create {num_virtual} hosted nodes in {NUM_BITS}-bit address space', file=sys.stderr)
         exit(1)
 
@@ -85,6 +85,9 @@ def main():
         os.rename('chord.log',
                   os.path.join('logs', f'chord_{time.time()}.log'))
 
+    # In order to guarantee that we can specify the exact number of nodes/virtual nodes
+    # and avoid hash collisions, we will generate random numbers in the address space and
+    # use those as if they were hashes
     hashes = generate_hash()
 
     node2name = {}
@@ -94,7 +97,7 @@ def main():
         if num_virtual:
             virtual = '--virtual-nodes '
             # Iterator
-            for j in range(num_virtual - 1):
+            for j in range(num_virtual):
                 digest = next(hashes)
                 virtual += f'vnode_{digest}:{digest} '
         else:

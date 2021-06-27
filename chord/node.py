@@ -338,6 +338,7 @@ class Node:
 
     def run(self, stabilize_interval=5, fix_fingers_interval=7):
         logging.info(f'Starting loop for node {self.digest_id}')
+        logging.info(f'Node {self.digest_id} managing virtual nodes: {self.virtual_nodes.keys()}')
 
         stability = self.context.socket(zmq.PAIR)
         stability.bind(self.stabilize_address)

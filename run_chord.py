@@ -15,10 +15,10 @@ stabilize_interval = 20
 fix_fingers_interval = 12
 name_fmt = 'node_{id}'
 cmd_fmt = 'python chord/node.py {action} {name} tcp://{ip} --internal-port 5555 ' \
-          '--external-port 5556 --real-hashes --stabilize-interval {stabilize_interval} ' \
-          '--fix-fingers-interval {fix_fingers_interval} {ext} &'
+          '--external-port 5556 --stabilize-interval {stabilize_interval} ' \
+          '--fix-fingers-interval {fix_fingers_interval} {ext} {virtual} &'
 join_fmt_ext = '--known-endpoint tcp://{ip}:5555 --known-name {name}'
-shutdown_cmd_fmt = 'python chord/node.py shutdown {name} tcp://{ip} --internal-port 5555 --real-hashes'
+shutdown_cmd_fmt = 'python chord/node.py shutdown {name} tcp://{ip} --internal-port 5555'
 
 
 class SingleSwitchTopo(Topo):
@@ -34,8 +34,9 @@ class SingleSwitchTopo(Topo):
 
 def generate_hash():
     random.seed(0)
-    valid_hashes = range(pow(2, NUM_BITS))
-    for hash_val in random.shuffle(valid_hashes):
+    max_value = pow(2, NUM_BITS)
+    valid_hashes = range(max_value)
+    for hash_val in random.sample(valid_hashes, max_value):
         yield hash_val
 
 
@@ -84,11 +85,21 @@ def main():
         os.rename('chord.log',
                   os.path.join('logs', f'chord_{time.time()}.log'))
 
+    hashes = generate_hash()
 
     node2name = {}
     for i, node in enumerate(net.hosts):
 
-        name = name_fmt.format(id=f'{i}')
+        name = next(hashes)
+        if num_virtual:
+            virtual = '--virtual-nodes '
+            # Iterator
+            for j in range(num_virtual - 1):
+                digest = next(hashes)
+                virtual += f'vnode_{digest}:{digest} '
+        else:
+            virtual = ''
+
         if i == 0:
             action = 'create'
             ext = ''
@@ -100,7 +111,8 @@ def main():
         node2name[node] = name
         cmd = cmd_fmt.format(action=action, name=name, ip=node.IP(), ext=ext,
                              stabilize_interval=stabilize_interval,
-                             fix_fingers_interval=fix_fingers_interval)
+                             fix_fingers_interval=fix_fingers_interval,
+                             virtual=virtual)
 
         print(f'Starting node {name}: {cmd}')
         node.cmd(cmd)

@@ -136,7 +136,7 @@ def main():
     os.rename(
         'chord.log',
         os.path.join('logs',
-                     f'chord_{time.time()}_{num_nodes}_{stabilize_interval}_{fix_fingers_interval}_{wait_time}.log'))
+                     f'chord_{time.time()}_{stabilize_interval}_{fix_fingers_interval}_{wait_time}.log'))
 
     net.stop()
 

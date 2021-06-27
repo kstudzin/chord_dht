@@ -95,3 +95,187 @@ def test_find_successor_chord_node(mock_zmq):
     assert actual_found
     assert actual_successor == v_node.routing_info
     assert actual_hops == 0
+
+
+@mock.patch('chord.node.zmq')
+def test_virtual_nodes(mock_zmq):
+    v_nodes = {'v_node_0': 1,
+               'v_node_1': 2}
+    node = Node('node_0', 160, 'tcp://127.0.0.1', '5556', '5555', v_nodes)
+
+    assert node.digest_id == 160
+    assert len(node.virtual_nodes) == 3
+
+    v_node = node.virtual_nodes[160]
+    assert v_node.get_digest() == 160
+    assert v_node.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.get_parent() == 160
+    assert v_node.successor.get_digest() == 160
+    assert v_node.successor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.successor.get_parent() == 160
+    assert v_node.predecessor.get_digest() == 160
+    assert v_node.predecessor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.predecessor.get_parent() == 160
+
+    v_node = node.virtual_nodes[1]
+    assert v_node.get_digest() == 1
+    assert v_node.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.get_parent() == 160
+    assert v_node.successor.get_digest() == 1
+    assert v_node.successor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.successor.get_parent() == 160
+    assert v_node.predecessor.get_digest() == 1
+    assert v_node.predecessor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.predecessor.get_parent() == 160
+
+    v_node = node.virtual_nodes[2]
+    assert v_node.get_digest() == 2
+    assert v_node.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.get_parent() == 160
+    assert v_node.successor.get_digest() == 2
+    assert v_node.successor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.successor.get_parent() == 160
+    assert v_node.predecessor.get_digest() == 2
+    assert v_node.predecessor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.predecessor.get_parent() == 160
+
+@mock.patch('chord.node.zmq')
+def test_virtual_nodes(mock_zmq):
+    v_nodes = {'v_node_0': 1,
+               'v_node_1': 2}
+    node = Node('node_0', 160, 'tcp://127.0.0.1', '5556', '5555', v_nodes)
+
+    assert node.digest_id == 160
+    assert len(node.virtual_nodes) == 3
+
+    v_node = node.virtual_nodes[160]
+    assert v_node.get_digest() == 160
+    assert v_node.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.get_parent() == 160
+    assert v_node.successor.get_digest() == 160
+    assert v_node.successor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.successor.get_parent() == 160
+    assert v_node.predecessor.get_digest() == 160
+    assert v_node.predecessor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.predecessor.get_parent() == 160
+
+    v_node = node.virtual_nodes[1]
+    assert v_node.get_digest() == 1
+    assert v_node.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.get_parent() == 160
+    assert v_node.successor.get_digest() == 1
+    assert v_node.successor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.successor.get_parent() == 160
+    assert v_node.predecessor.get_digest() == 1
+    assert v_node.predecessor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.predecessor.get_parent() == 160
+
+    v_node = node.virtual_nodes[2]
+    assert v_node.get_digest() == 2
+    assert v_node.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.get_parent() == 160
+    assert v_node.successor.get_digest() == 2
+    assert v_node.successor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.successor.get_parent() == 160
+    assert v_node.predecessor.get_digest() == 2
+    assert v_node.predecessor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.predecessor.get_parent() == 160
+
+
+@mock.patch('chord.node.zmq')
+def test_virtual_nodes(mock_zmq):
+    v_nodes = {'v_node_0': 1,
+               'v_node_1': 2}
+    node = Node('node_0', 160, 'tcp://127.0.0.1', '5556', '5555', v_nodes)
+
+    assert node.digest_id == 160
+    assert len(node.virtual_nodes) == 3
+
+    v_node = node.virtual_nodes[160]
+    assert v_node.get_digest() == 160
+    assert v_node.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.get_parent() == 160
+    assert v_node.successor.get_digest() == 160
+    assert v_node.successor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.successor.get_parent() == 160
+    assert v_node.predecessor.get_digest() == 160
+    assert v_node.predecessor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.predecessor.get_parent() == 160
+
+    v_node = node.virtual_nodes[1]
+    assert v_node.get_digest() == 1
+    assert v_node.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.get_parent() == 160
+    assert v_node.successor.get_digest() == 1
+    assert v_node.successor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.successor.get_parent() == 160
+    assert v_node.predecessor.get_digest() == 1
+    assert v_node.predecessor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.predecessor.get_parent() == 160
+
+    v_node = node.virtual_nodes[2]
+    assert v_node.get_digest() == 2
+    assert v_node.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.get_parent() == 160
+    assert v_node.successor.get_digest() == 2
+    assert v_node.successor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.successor.get_parent() == 160
+    assert v_node.predecessor.get_digest() == 2
+    assert v_node.predecessor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.predecessor.get_parent() == 160
+
+
+@mock.patch('chord.node.zmq')
+def test_create(mock_zmq):
+    v_nodes = {'v_node_53': 53,
+               'v_node_234': 234,
+               'v_node_172': 172}
+    node = Node('node_0', 160, 'tcp://127.0.0.1', '5556', '5555', v_nodes)
+    node.create()
+
+    assert node.digest_id == 160
+    assert len(node.virtual_nodes) == 4
+
+    v_node = node.virtual_nodes[160]
+    assert v_node.get_digest() == 160
+    assert v_node.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.get_parent() == 160
+    assert v_node.successor.get_digest() == 234
+    assert v_node.successor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.successor.get_parent() == 160
+    assert v_node.predecessor.get_digest() == 160
+    assert v_node.predecessor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.predecessor.get_parent() == 160
+
+    v_node = node.virtual_nodes[53]
+    assert v_node.get_digest() == 53
+    assert v_node.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.get_parent() == 160
+    assert v_node.successor.get_digest() == 234
+    assert v_node.successor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.successor.get_parent() == 160
+    assert v_node.predecessor.get_digest() == 53
+    assert v_node.predecessor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.predecessor.get_parent() == 160
+
+    v_node = node.virtual_nodes[172]
+    assert v_node.get_digest() == 172
+    assert v_node.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.get_parent() == 160
+    assert v_node.successor.get_digest() == 234
+    assert v_node.successor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.successor.get_parent() == 160
+    assert v_node.predecessor.get_digest() == 172
+    assert v_node.predecessor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.predecessor.get_parent() == 160
+
+    v_node = node.virtual_nodes[234]
+    assert v_node.get_digest() == 234
+    assert v_node.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.get_parent() == 160
+    assert v_node.successor.get_digest() == 53
+    assert v_node.successor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.successor.get_parent() == 160
+    assert v_node.predecessor.get_digest() == 234
+    assert v_node.predecessor.get_address() == 'tcp://127.0.0.1:5555'
+    assert v_node.predecessor.get_parent() == 160

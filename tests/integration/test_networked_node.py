@@ -143,5 +143,94 @@ def test_join():
 
 
 def test_stabilize():
-    # TODO test stabilize runs on all virtual nodes
-    pass
+    # TODO - verify this runs the same in other environments
+    # Unclear if the dependencies between the dict and the order in which the stabilization
+    # happens will be the same in another environemnt
+
+    v_nodes = {'v_node_53': 53,
+               'v_node_234': 234,
+               'v_node_172': 172}
+    node = Node('node_0', 160, 'tcp://127.0.0.1', '5556', '5555', v_nodes)
+    node.create()
+
+    node1_t = threading.Thread(target=node.run, args=[None, None], daemon=True)
+    node1_t.start()
+
+    stabilize_pair = node.context.socket(zmq.PAIR)
+    stabilize_pair.connect(node.stabilize_address)
+    node._stabilize(stabilize_pair)
+    time.sleep(.5)
+
+    v_node = node.virtual_nodes[160]
+    assert v_node.successor.digest == 172
+    assert v_node.predecessor.digest == 160
+
+    v_node = node.virtual_nodes[172]
+    assert v_node.successor.digest == 234
+    assert v_node.predecessor.digest == 160
+
+    v_node = node.virtual_nodes[234]
+    assert v_node.successor.digest == 53
+    assert v_node.predecessor.digest == 172
+
+    v_node = node.virtual_nodes[53]
+    assert v_node.successor.digest == 234
+    assert v_node.predecessor.digest == 234
+
+    node._stabilize(stabilize_pair)
+    time.sleep(.5)
+
+    v_node = node.virtual_nodes[160]
+    assert v_node.successor.digest == 172
+    assert v_node.predecessor.digest == 160
+
+    v_node = node.virtual_nodes[172]
+    assert v_node.successor.digest == 234
+    assert v_node.predecessor.digest == 160
+
+    v_node = node.virtual_nodes[234]
+    assert v_node.successor.digest == 53
+    assert v_node.predecessor.digest == 172
+
+    v_node = node.virtual_nodes[53]
+    assert v_node.successor.digest == 172       # changed
+    assert v_node.predecessor.digest == 234
+
+    node._stabilize(stabilize_pair)
+    time.sleep(.5)
+
+    v_node = node.virtual_nodes[160]
+    assert v_node.successor.digest == 172
+    assert v_node.predecessor.digest == 53      # changed
+
+    v_node = node.virtual_nodes[172]
+    assert v_node.successor.digest == 234
+    assert v_node.predecessor.digest == 160
+
+    v_node = node.virtual_nodes[234]
+    assert v_node.successor.digest == 53
+    assert v_node.predecessor.digest == 172
+
+    v_node = node.virtual_nodes[53]
+    assert v_node.successor.digest == 160       # changed
+    assert v_node.predecessor.digest == 234
+
+    # Ensure nothing changes
+    node._stabilize(stabilize_pair)
+    time.sleep(.5)
+
+    v_node = node.virtual_nodes[160]
+    assert v_node.successor.digest == 172
+    assert v_node.predecessor.digest == 53
+
+    v_node = node.virtual_nodes[172]
+    assert v_node.successor.digest == 234
+    assert v_node.predecessor.digest == 160
+
+    v_node = node.virtual_nodes[234]
+    assert v_node.successor.digest == 53
+    assert v_node.predecessor.digest == 172
+
+    v_node = node.virtual_nodes[53]
+    assert v_node.successor.digest == 160
+    assert v_node.predecessor.digest == 234

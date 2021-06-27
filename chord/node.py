@@ -1,6 +1,7 @@
 import argparse
 import logging
 import pprint
+import random
 import struct
 import sys
 import threading
@@ -109,10 +110,10 @@ class RoutingInfo:
         return self.address
 
     def __str__(self):
-        return f'RoutingInfo: digest: {self.digest}, parent_digest: {self.parent_digest}, address: {self.address}'
+        return f'digest: {self.digest}, parent_digest: {self.parent_digest}, address: {self.address}'
 
     def __repr__(self):
-        return f'RoutingInfo: {vars(self)}'
+        return f'{vars(self)}'
 
     def __eq__(self, other):
         return other and \
@@ -165,7 +166,8 @@ class Node:
 
         virtual_nodes = {digest: virtual_node_type(name, digest, self.digest_id, self.internal_endpoint)
                          for name, digest in virtual.items()}
-        virtual_nodes[self.digest_id] = virtual_node_type(self.name, self.digest_id, self.digest_id, self.internal_endpoint)
+        virtual_nodes[self.digest_id] = virtual_node_type(self.name, self.digest_id, self.digest_id,
+                                                          self.internal_endpoint)
 
         return virtual_nodes
 
@@ -221,6 +223,34 @@ class Node:
             logging.error(f'Node {initiator.get_parent()} unable to update finger {index} '
                           f'on virtual node {initiator.get_digest()}')
 
+    def create(self):
+        # When there is only one node in the network, the virtual nodes must still be connected
+        # for the synchronization protocols to work. No nodes are running at this point so we
+        # can't use the join call, but because all of the the nodes in the network are on the
+        # current machine, we can calculate the successors locally.
+        #
+        # It is also possible to do this calculation in the constructor but that would mean we
+        # need to do it for every node. But it does not make sense to do this calculation for
+        # nodes after this because when they join the network for real, they will then need to find
+        # they're true successor in the network.
+
+        if len(self.virtual_nodes) > 2:
+            node_iter = iter(self.virtual_nodes.values())
+            node1 = next(node_iter)
+            node2 = next(node_iter)
+            node1.successor = node2.routing_info
+            node2.successor = node1.routing_info
+
+            for node in node_iter:
+
+                digest = node.get_digest()
+                found, next_node, hops = node1.find_successor(digest, 0)
+                while not found:
+                    found, next_node, hops = next_node.find_successor(digest, hops)
+                node.successor = next_node
+
+        return len(self.virtual_nodes)
+
     def join(self, known_id, known_address):
         logging.debug(f'Node {self.digest_id} at {self.internal_endpoint} joining '
                       f'known node {known_id} at {known_address}')
@@ -229,6 +259,8 @@ class Node:
             success = self.join_vnode(known_id, known_address, v_node)
             if not success:
                 self.virtual_nodes.pop(v_node.get_digest())
+
+        # TODO - if no virtual nodes, shutdown
 
         return len(self.virtual_nodes)
 
@@ -532,25 +564,18 @@ EXIT_COMMAND = ExitCommand()
 # CLI Helpers
 # -----------------------------------------------------------------------------
 
-def finger_table(node):
-    fingers = node.fingers
-    addresses = node.finger_addresses
-    table = [{"position": i, "id": finger, "endpoint": address}
-             for i, (finger, address) in enumerate(zip(fingers, addresses)) if finger and address]
-    return {"name": node.get_name(), "id": node.get_id(), "fingers": table}
-
 
 def finger_table_links(node):
-    table = finger_table(node)
-    table['successor'] = node.successor
-    table['predecessor'] = node.predecessor
-
-    return table
+    return [vars(v_node) for v_node in node.virtual_nodes.values()]
 
 
-def handle_shutdown(name, address, internal_port):
+def to_int(digest):
+    return int(digest)
+
+
+def handle_shutdown(name, address, internal_port, hash):
     endpoint = f'{address}:{internal_port}'
-    digest = hash_value(name)
+    digest = hash(name)
 
     try:
         context = zmq.Context()
@@ -566,28 +591,28 @@ def handle_shutdown(name, address, internal_port):
         context.destroy()
 
 
-def handle_new_node(name, address, external_port, internal_port, action, max_retries,
-                    known_endpoint, known_name, stabilize_interval, fix_fingers_interval):
-    node = Node(name, hash_value(name), address, external_port, internal_port)
-    if action == 'join':
+def handle_new_node(name, address, external_port, internal_port, action,
+                    known_endpoint, known_name, stabilize_interval, fix_fingers_interval,
+                    node_type, hash, virtual_nodes):
+    node = node_type(name, hash(name), address, external_port, internal_port, dict(virtual_nodes))
+
+    if action == 'create':
+        num_added = node.create()
+    elif action == 'join':
         if not known_endpoint or not known_name:
-            return 1, 'Error: Could not join network. Must have known name and known address to join network'
+            raise ValueError('join action requires known name and known address')
 
-        joined = node.join(hash_value(known_name), known_endpoint)
-        for i in range(max_retries):
-            if joined:
-                break
-            name = f'node_{randrange(999)}'
-            node = Node(name, hash_value(name), address, external_port, internal_port)
-            joined = node.join(hash_value(known_name), known_endpoint)
-
-        if not joined:
-            return 2, 'Error: Unable to join network. Max retries reached.'
+        num_added = node.join(hash(known_name), known_endpoint)
 
     node_t = threading.Thread(target=node.run, args=[stabilize_interval, fix_fingers_interval])
     node_t.start()
 
-    return 0, node
+    return num_added, node
+
+
+def virtual_node(v_node):
+    split = v_node.split(':')
+    return split[0], int(split[1])
 
 
 def port(port_val):
@@ -602,7 +627,8 @@ def config_parser():
     parser.add_argument('action', choices=['create', 'join', 'shutdown'],
                         help='create to create a network, i.e. this node is the first to join.\n'
                              'join to join an existing network')
-    parser.add_argument('name', type=str, help='Name of node to create')
+    parser.add_argument('name', type=str, help='Name of node to create. When --real-hashes is NOT specified, '
+                                               'the name should be the digest.')
     parser.add_argument('address', type=str, help='Address of node')
 
     parser.add_argument('--known-endpoint', '-ke', type=str,
@@ -614,15 +640,27 @@ def config_parser():
                         help='port for chord node to receive messages from other chord nodes')
     parser.add_argument('--external-port', '-e', type=port, default=None,
                         help='port for clients to communicate with chord node')
-    parser.add_argument('--stabilize-interval', '-s', type=int, default=60,
+    parser.add_argument('--stabilize-interval', '-s', type=int, default=15,
                         help='seconds between stabilize executions')
-    parser.add_argument('--fix-fingers-interval', '-f', type=int, default=50,
+    parser.add_argument('--fix-fingers-interval', '-f', type=int, default=10,
                         help='seconds between fix fingers executions')
     parser.add_argument('--quiet', '-q', action='store_true',
                         help='Print less log info')
 
-    parser.add_argument('--max-retries', '-r', type=int, default=0,
-                        help='number of times to retry joining the network with new, generated name')
+    parser.add_argument('--virtual-nodes', '-vn', type=virtual_node, nargs='+', default=[],
+                        metavar='node_name:digest',
+                        help='Number of virtual nodes to run on this instance. Also referred to as the'
+                             'weight of the node and should correspond to how powerful the server is.')
+    parser.add_argument('--real-hashes', '-rh', action='store_const', const=hash_value,
+                        help='By default, hashes are artificially generated to avoid duplicates in '
+                             'the small address space. This option allows using real hashes.')
+
+    node_type_group = parser.add_mutually_exclusive_group()
+    node_type_group.add_argument('--naive-nodes', action='store_const', const=Node,
+                                 help='Build naive nodes. Only useful with \'hops\' action. Cannot be used with '
+                                      'another node type')
+    node_type_group.add_argument('--chord-nodes', action='store_const', const=ChordNode,
+                                 help='Build chord nodes. Cannot be used with another node type')
 
     return parser
 
@@ -645,19 +683,23 @@ def main():
     stabilize_interval = args.stabilize_interval
     fix_fingers_interval = args.fix_fingers_interval
     quiet = args.quiet
+    virtual_nodes = args.virtual_nodes
 
-    max_retries = args.max_retries
+    hash = next(hash_func for hash_func in [args.real_hashes, to_int]
+                if hash_func is not None)
+
+    # Retrieve first non None value
+    node_type = next(node_type
+                     for node_type in [args.chord_nodes, args.naive_nodes, ChordNode]
+                     if node_type is not None)
 
     if action == 'create' or action == 'join':
-        result = handle_new_node(name, address, external_port, internal_port, action,
-                                 max_retries, known_endpoint, known_name, stabilize_interval,
-                                 fix_fingers_interval)
-        if result[0] != 0:
-            print(result[1], file=sys.stderr)
-            exit(result[0])
 
-        node = result[1]
-        print(f'Node {node.name} joined network')
+        num_nodes, node = handle_new_node(name, address, external_port, internal_port, action,
+                                          known_endpoint, known_name, stabilize_interval,
+                                          fix_fingers_interval, node_type, hash, virtual_nodes)
+
+        print(f'Node {node.name} joined network with {num_nodes - 1} virtual node(s)')
 
         while not quiet:
             pp.pprint(finger_table_links(node))
@@ -666,8 +708,9 @@ def main():
             time.sleep(30)
 
     elif action == 'shutdown':
+
         print('Shutting down...')
-        handle_shutdown(name, address, internal_port)
+        handle_shutdown(name, address, internal_port, hash)
         print(f'Shutdown node {name}')
 
 

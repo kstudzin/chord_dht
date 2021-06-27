@@ -1,4 +1,7 @@
 import argparse
+import os
+import random
+import sys
 import time
 
 from mininet.log import setLogLevel
@@ -6,13 +9,16 @@ from mininet.net import Mininet
 from mininet.node import Controller
 from mininet.topo import SingleSwitchTopo, Topo
 
+from chord.hash import NUM_BITS
+
+stabilize_interval = 20
+fix_fingers_interval = 12
 name_fmt = 'node_{id}'
 cmd_fmt = 'python chord/node.py {action} {name} tcp://{ip} --internal-port 5555 ' \
-          '--external-port 5556 --stabilize-interval 5 --fix-fingers-interval 7 ' \
-          '{ext} &'
+          '--external-port 5556 --real-hashes --stabilize-interval {stabilize_interval} ' \
+          '--fix-fingers-interval {fix_fingers_interval} {ext} &'
 join_fmt_ext = '--known-endpoint tcp://{ip}:5555 --known-name {name}'
-shutdown_cmd_fmt = 'python chord/node.py shutdown {name} tcp://{ip} --internal-port 5555'
-
+shutdown_cmd_fmt = 'python chord/node.py shutdown {name} tcp://{ip} --internal-port 5555 --real-hashes'
 
 
 class SingleSwitchTopo(Topo):
@@ -24,6 +30,13 @@ class SingleSwitchTopo(Topo):
         for h in range(n):
             host = self.addHost('h%s' % (h + 1))
             self.addLink(host, switch)
+
+
+def generate_hash():
+    random.seed(0)
+    valid_hashes = range(pow(2, NUM_BITS))
+    for hash_val in random.shuffle(valid_hashes):
+        yield hash_val
 
 
 def create_network(n_hosts):
@@ -38,7 +51,11 @@ def config_parser():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('nodes', type=int, default=10,
-                        help='number of nodes in network')
+                        help='Number of nodes in network')
+
+    # TODO - should be able to have different numbers of virtual nodes on each node
+    parser.add_argument('--virtual-nodes', '-vn', type=int, default=0,
+                        help='Number of nodes hosted on a single instance.')
 
     return parser
 
@@ -48,10 +65,25 @@ def main():
     args = parser.parse_args()
 
     num_nodes = args.nodes
+    if not num_nodes < pow(2, NUM_BITS):
+        print(f'Cannot create {num_nodes} nodes in {NUM_BITS}-bit address space', file=sys.stderr)
+        exit(1)
+
+    num_virtual = args.virtual_nodes
+    if not num_virtual * num_nodes < pow(2, NUM_BITS):
+        print(f'Cannot create {num_virtual} hosted nodes in {NUM_BITS}-bit address space', file=sys.stderr)
+        exit(1)
 
     # Create and start network
     net = create_network(num_nodes)
     net.start()
+
+    # Move old log into logs dir to ensure we have a fresh log
+    os.makedirs('logs', exist_ok=True)
+    if os.path.isfile('chord.log'):
+        os.rename('chord.log',
+                  os.path.join('logs', f'chord_{time.time()}.log'))
+
 
     node2name = {}
     for i, node in enumerate(net.hosts):
@@ -66,13 +98,16 @@ def main():
             ext = join_ext
 
         node2name[node] = name
-        cmd = cmd_fmt.format(action=action, name=name, ip=node.IP(), ext=ext)
+        cmd = cmd_fmt.format(action=action, name=name, ip=node.IP(), ext=ext,
+                             stabilize_interval=stabilize_interval,
+                             fix_fingers_interval=fix_fingers_interval)
 
         print(f'Starting node {name}: {cmd}')
         node.cmd(cmd)
 
     # Allow stabilize and finger node processes to complete
-    time.sleep(10 * (num_nodes + 1))
+    wait_time = 25
+    time.sleep(wait_time * (num_nodes + 1))
 
     # Send shut down commands
     for node, name in node2name.items():
@@ -83,6 +118,10 @@ def main():
     # Make sure logs have time to finish printing before shutting down nodes
     # so we can check our system's state
     time.sleep(.3 * num_nodes)
+    os.rename(
+        'chord.log',
+        os.path.join('logs',
+                     f'chord_{time.time()}_{num_nodes}_{stabilize_interval}_{fix_fingers_interval}_{wait_time}.log'))
 
     net.stop()
 

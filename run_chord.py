@@ -11,8 +11,7 @@ from mininet.topo import SingleSwitchTopo, Topo
 
 from chord.hash import NUM_BITS
 
-stabilize_interval = 20
-fix_fingers_interval = 12
+
 name_fmt = 'node_{id}'
 cmd_fmt = 'python chord/node.py {action} {name} tcp://{ip} --internal-port 5555 ' \
           '--external-port 5556 --stabilize-interval {stabilize_interval} ' \
@@ -54,8 +53,15 @@ def config_parser():
     parser.add_argument('nodes', type=int, default=10,
                         help='Number of nodes in network')
 
+    parser.add_argument('--stabilize-interval', '-s', type=int, default=15,
+                        help='seconds between stabilize executions')
+    parser.add_argument('--fix-fingers-interval', '-f', type=int, default=10,
+                        help='seconds between fix fingers executions')
+    parser.add_argument('--wait-per-node', '-w', type=int, default=10,
+                        help='amount of time (in seconds) to wait per node for the network to stabilize')
+
     # TODO - should be able to have different numbers of virtual nodes on each node
-    parser.add_argument('--nodes-per-host', '-nph', type=int, default=0,
+    parser.add_argument('--nodes-per-host', '-nph', type=int, default=1,
                         help='Number of nodes hosted on a single instance.')
 
     return parser
@@ -64,6 +70,10 @@ def config_parser():
 def main():
     parser = config_parser()
     args = parser.parse_args()
+
+    stabilize_interval = args.stabilize_interval
+    fix_fingers_interval = args.fix_fingers_interval
+    wait_per_node = args.wait_per_node
 
     num_nodes = args.nodes
     if not num_nodes < pow(2, NUM_BITS):
@@ -121,8 +131,7 @@ def main():
         node.cmd(cmd)
 
     # Allow stabilize and finger node processes to complete
-    wait_time = 25
-    time.sleep(wait_time * (num_nodes + 1))
+    time.sleep(wait_per_node * num_nodes * (num_virtual + 1))
 
     # Send shut down commands
     for node, name in node2name.items():
@@ -136,7 +145,7 @@ def main():
     os.rename(
         'chord.log',
         os.path.join('logs',
-                     f'chord_{time.time()}_{stabilize_interval}_{fix_fingers_interval}_{wait_time}.log'))
+                     f'chord_{time.time()}_{stabilize_interval}_{fix_fingers_interval}_{wait_per_node}.log'))
 
     net.stop()
 

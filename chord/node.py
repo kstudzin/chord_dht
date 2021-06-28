@@ -249,7 +249,8 @@ class Node:
                 digest = node.get_digest()
                 found, next_node, hops = node1.find_successor(digest, 0)
                 while not found:
-                    found, next_node, hops = next_node.find_successor(digest, hops)
+                    node = self.virtual_nodes[next_node.get_digest()]
+                    found, next_node, hops = node.find_successor(digest, hops)
                 node.successor = next_node
 
         return len(self.virtual_nodes)
@@ -373,7 +374,7 @@ class Node:
                     break
 
             logging.info(f'Node {self.digest_id} shutting down...')
-            logging.info(finger_table_links(self))
+            logging.info(f'Node state: {[vars(v_node) for v_node in self.virtual_nodes.values()]}')
 
         finally:
             logging.debug(f'Node {self.digest_id} destroying context...')
@@ -434,6 +435,9 @@ class ChordNode(Node):
         return ChordVirtualNode
 
 
+# TODO extract common logic to command
+# TODO refactor if/else to state command
+# TODO optimize requests on the same host
 class Command:
 
     def execute(self, node):

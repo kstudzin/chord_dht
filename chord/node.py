@@ -581,9 +581,9 @@ def to_int(digest):
     return int(digest)
 
 
-def handle_shutdown(name, address, internal_port, hash):
+def handle_shutdown(name, address, internal_port, hash_func):
     endpoint = f'{address}:{internal_port}'
-    digest = hash(name)
+    digest = hash_func(name)
 
     try:
         context = zmq.Context()
@@ -601,8 +601,8 @@ def handle_shutdown(name, address, internal_port, hash):
 
 def handle_new_node(name, address, external_port, internal_port, action,
                     known_endpoint, known_name, stabilize_interval, fix_fingers_interval,
-                    node_type, hash, virtual_nodes):
-    node = node_type(name, hash(name), address, external_port, internal_port, dict(virtual_nodes))
+                    node_type, hash_func, virtual_nodes):
+    node = node_type(name, hash_func(name), address, external_port, internal_port, dict(virtual_nodes))
 
     if action == 'create':
         num_added = node.create()
@@ -610,7 +610,7 @@ def handle_new_node(name, address, external_port, internal_port, action,
         if not known_endpoint or not known_name:
             raise ValueError('join action requires known name and known address')
 
-        num_added = node.join(hash(known_name), known_endpoint)
+        num_added = node.join(hash_func(known_name), known_endpoint)
 
     node_t = threading.Thread(target=node.run, args=[stabilize_interval, fix_fingers_interval])
     node_t.start()
@@ -694,8 +694,8 @@ def main():
     quiet = args.quiet
     virtual_nodes = args.virtual_nodes
 
-    hash = next(hash_func for hash_func in [args.real_hashes, to_int]
-                if hash_func is not None)
+    hash_func = next(hash_func for hash_func in [args.real_hashes, to_int]
+                     if hash_func is not None)
 
     # Retrieve first non None value
     node_type = next(node_type
@@ -706,7 +706,7 @@ def main():
 
         num_nodes, node = handle_new_node(name, address, external_port, internal_port, action,
                                           known_endpoint, known_name, stabilize_interval,
-                                          fix_fingers_interval, node_type, hash, virtual_nodes)
+                                          fix_fingers_interval, node_type, hash_func, virtual_nodes)
 
         print(f'Node {node.name} joined network with {num_nodes - 1} virtual node(s)')
 
@@ -719,7 +719,7 @@ def main():
     elif action == 'shutdown':
 
         print('Shutting down...')
-        handle_shutdown(name, address, internal_port, hash)
+        handle_shutdown(name, address, internal_port, hash_func)
         print(f'Shutdown node {name}')
 
 

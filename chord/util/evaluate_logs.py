@@ -107,7 +107,6 @@ def config_parser():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('filename', type=str, help='name of log to evaluate')
-    parser.add_argument('--expected-nodes', '-e', type=int, help='number of nodes running over logged period')
     parser.add_argument('--load-statistics', '-l', action='store_true',
                         help='calculate mean and std dev of number of keys each physical node is responsible for')
     parser.add_argument('--finger-errors', '-f', action='store_true',
@@ -123,7 +122,6 @@ def main():
     args = parser.parse_args()
 
     filename = args.filename
-    expected_num = args.expected_nodes
     load_statistics = args.load_statistics
     finger_errors = args.finger_errors
     verbose = args.verbose
@@ -140,16 +138,13 @@ def main():
 
     # Calculate errors
     if finger_errors:
-        print(f'Evaluating {len(nodes_map)} nodes')
+        print(f'Evaluating {len(nodes_map)} nodes out of {len(digests)} nodes started')
         errors = calculate_errors(nodes_map)
-        print(f'{len({elt[0] for elt in errors})} nodes contain errors')
+        print(f'{len({elt[0] for elt in errors})} nodes contain {len(errors)} errors')
 
         if verbose:
             for digest, idx, actual, expected in errors:
                 print(f'Node {digest} has incorrect finger[{idx}]. Actual: {actual} Expected: {expected}')
-
-        if expected_num:
-            print(f'Result: Log {filename} contains {(expected_num - len(nodes_map)) + len(errors)} errors')
 
 
 if __name__ == '__main__':

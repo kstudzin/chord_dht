@@ -30,6 +30,7 @@ Run tests using `pytest` from the project root or `tests` directories. All docum
 | Chord routing | `chord/directchord.py` |
 | Synchronization Protocol | `chord/directchord.py` |
 | Run on Mininet | `chord/node.py` |
+| Virtual Nodes | `chord/node.py` |
 
 ### Chord Worksheet
 
@@ -268,25 +269,32 @@ The tests create a new node named `node_added_0` whose digest is `218`. The sync
 
 #### Design
 
-_**Socket Initialization**_
-
-Sockets are instance attributes - except for the pair sockets used in threads. They are bound in the constructor so that they are available to `join()` before they are used in `run()`.
-
 _**Node Sockets**_
 
-Each Node has two sockets for communicating with other Nodes: ROUTER and DEALER. We use these sockets so that nodes can communicate asynchronously. When nodes send messages to other nodes, they do not wait for a reply. For example, in `find_successor()` when a node finds the next node to query, it simply wants to pass of the responsibility to that node. When a client communicates with a node, it may receive a reply from a different node.
+Each node has two sockets for communicating with other nodes: ROUTER and DEALER. We use these sockets so that nodes can communicate asynchronously. In other words, when nodes send messages to other nodes, they do not wait for a reply. For example, in `find_successor()` when a node finds the next node to query, it simply wants to pass off the search to that node. Or when a node receives a client request, it may pass the request off to another node who will respond to the client.
 
-The ROUTER socket is used because it can send messages to specific sockets and receive the identity of sockets that send messages to it. It needs to be able to send messages to specific sockets because that is how it communicates with specific network nodes it knows about. It needs to know the identity of sockets that send messages to it when it talks to clients. When a client wants information from the network, it will send a message to some node in the network. That node will forward the message to other nodes as the network searches for the requested data. The network node that received the client message will insert an identifier for the client into the message so that the node that has the data is able to return the data to the appropriate client. In this system the ROUTER socket is used to send messages to internal nodes and external clients as well as to receive messages from clients.
+Nodes use their ROUTER socket for two purposes: receiving messages from clients and sending messages.
+Nodes receive messages from clients on the router socket because the router receives the identity of sending socket. The nodes will pass the identity to other nodes as they look up the information the client requested, and when a node finds the information, it will respond to the client directly on its router socket. The ability to communicate with a specific socket by knowing its identity is the other reason nodes use router sockets. Nodes send all messages, to network nodes as well as clients, with the router socket for this reason.
 
-The DEALER socket is used because it can specify its identity so that the ROUTER socket can send messages directly to it. It is used to receive messages from other nodes in the network.
+Nodes use their DEALER socket for receiving messages from nodes in the network. They use dealers for this purpose because dealer sockets can set their identity property. In this implementation, dealers set their socket identity to the digest of the node. This allows a network node to send messages to another network node knowing its name, more specifically the hashed digest of the name, and its address. 
+
+Each socket must be bound to an endpoint and because each node has two sockets, it also has two endpoints. These endpoints are differentiated by the types of messages they receive. The dealer socket receives messages from network nodes, so its endpoint is called the internal endpoint. The router socket receives messages from clients, so its endpoint is called the external endpoint.
+
+Nodes also have 2 sets of PAIR sockets used in the synchronization protocol. These are discussed in the 'Threads' section.
+
+_**Socket Initialization**_
+
+Except for the pair sockets used in threads, sockets are instance attributes on the nodes. They are bound in the constructor so that they are available to `join()` before they are used in `run()`. It is key that `join()` is called before `run()` because `join()` needs to communicate with other nodes to initialize the successor on the new nodes.
 
 _**Threads**_
 
-Running Chord requires synchronization tasks to run periodically to incorporate newly joined nodes into the network. To do that, we run threads that  initiate the tasks of stabilizing nodes and fixing finger tables. These tasks require communication with other nodes in the network. Because sockets are not thread safe, the threads use PAIR sockets to notify the main thread when a task needs to be done. Threads use subclasses of the `Command` class to specify the task that needs to be completed, and the main thread performs the task. Command classes also allows the main thread to handle manipulating of instance attributes to avoid concurrency problems.
+Chord requires synchronization tasks to run periodically to adjust node links, i.e., successor, predecessor, and fingers, for joining and leaving nodes. To do that, each node runs two threads: one runs stabilize and the other runs fix fingers. These tasks require communication with other nodes in the network, but because sockets are not thread-safe, we can not use the dealer and router sockets discussed above. Instead, threads use the inproc communication protocol with PAIR sockets. 
+
+Further, these protocols are implemented such that they avoid accessing shared data, such as instance attributes, in non-thread-safe ways. Specifically, they iterate over the virtual nodes, which are not modified after initialization, and they read a single object from that structure which is an atomic operation. The thread uses the pair socket to pass this information to the main thread which updates data and communicates with other nodes.
 
 _**Commands**_
 
-The `Command` classes provide a template for messages nodes pass to each other, encapsulate the data and logic associated with each operation, and abstract the operation logic from the node itself. As we will see in later tasks, the `Command` class allows us to add new commands, such as `get` and `put`, without changing large parts of the core node code. 
+The `Command` subclasses provide templates for messages nodes send to each other, encapsulate the data and logic associated with each operation, and abstract the operation logic from the node. 
 
 #### Execution
 
@@ -297,21 +305,94 @@ pytest tests/integration/test_networked_node.py
 # CLI
 
 ## Start the first node
-python node.py create node_0 tcp://127.0.0.1 --internal-port 5501 --external-port 5502
+python node.py create node_0 tcp://127.0.0.1 --internal-port 5501 --external-port 5502 --real-hashes
 
 ## Start a second node
-python node.py join node_1 tcp://127.0.0.1 --internal-port 5503 --external-port 5504 --known-endpoint tcp://127.0.0.1:5501 --known-name node_0
+python node.py join node_1 tcp://127.0.0.1 --internal-port 5503 --external-port 5504 --known-endpoint tcp://127.0.0.1:5501 --known-name node_0 --real-hashes
 
 ## Shut down the first node
- python node.py shutdown node_0 tcp://127.0.0.1 --internal-port 5501
+python node.py shutdown node_0 tcp://127.0.0.1 --internal-port 5501 --real-hashes
 
 ## Run on mininet
 sudo python run_chord.py 25
+
+## Evaluate log output
+python chord/util/evaluate_logs.py logs/chord_1624888721.9974809_15_10_20.log --finger-errors --verbose
 ```
+
+The node module includes code to start a node on the current machine. This script has two actions to spin up nodes: `create` starts the first node in a network and `join` starts subsequent nodes. This script is used by the `run_chord.py` mininet script to start multiple nodes on a virtual network. 
+
+The mininet script starts the number of requested nodes, waits some period of time for them to run synchronization, and shuts down each node.
+
+While the network is running, logs are output to `chord.log`. When using the mininet script, logs are migrated to the `logs` directory after the run is complete. The `evaluate_logs.py` script reads the logs and evaluates if the network had stabilized by the time it shutdown.
 
 #### Results
 
-When running on mininet, set the log level to INFO in `chord/util.py` to see the nodes start the main execution loop and print their finger tables, successors, and predecessor as they exit. The script that runs the topology brings up each node, waits some amount of time for the network to stabilize, and then shuts down each node. At this stage, setting the stabilize interval and the fix fingers interval is hard coded into the script. When setting this number is important to balance not running to frequently. If run every second, for example, some nodes may hog the processor and others won't have their synchronization tasks run. On the other hand setting to interval too long means waiting for the script to complete while no work is happening. Note that this script sleeps in between bringing the nodes up and shutting them down to allow time to stabilize. The amount of time it sleeps is dependent on how many nodes are running. I chose the amount of time per node to be slightly longer than the longer interval of stabilize and fix fingers. This is to ensure that fix fingers gets a chance to run after stabilize on each node.
+When running chord on mininet, there are three settings to consider: the interval between calls to stabilize, the interval between calls to fix fingers, and the amount of time to wait for the network to synchronize. In my tests using 25 nodes, I set the stabilize interval to 15 seconds and the fix fingers to 10 seconds. I tested wait times of 10, 20, and 30 seconds per node, and the fingers had 75, 23, and 0 errors, respectively. This means that the network took between 8 and 12.5 seconds to stabilize. In practice there is no wait time and the network may never fully stabilize because nodes will be leaving and enter regularly.
+
+### Virtual Nodes
+
+**File:** `chord/node.py`, `run_chord.py` <br>
+**Python structure:** `chord.node.VirtualNode`, `chord.node.ChordVirtualNode`, `chord.node.Node.virtual_nodes`, `chord.node.RoutingInfo`, `chord.node.Node.create()`
+
+#### Design
+
+This iteration adds several new classes. The `VirtualNode` class contains all the information linking a node to other nodes in the network: successor, predecessor, and fingers. Each of these links as well the `VirtualNode` is an instance of `RoutingInfo` which contains information to send messages to a node. Specifically, it has a node's digest, the host node's digest, and the host node's address. One of the virtual nodes will always be the host node. In this case, the digest and parent's digest are the same. `VirtualNode` also contains the methods, such as `find_successor()`, for retrieving and manipulating those links. `ChordVirtualNode` is a subclass that contains the `closest_preceding_finger()` method. As a result of these class, most of the code managing the links between nodes is maintained in the `VirtualNode` class, and the code managing passing messages around the network remains in the `Node` class. One optimization that has not yet been made is to avoid sending messages over the network when one virtual node is looking for information on a virtual node hosted by the same parent node.
+
+Adding virtual nodes required a change in start up procedure. When the host starts, it needs to find the successor for each virtual node. This was not necessary before because there was only one node, but with 2 or more virtual nodes, the nodes should be find their successor within the group. Without this initialization, the synchronization protocols won't properly adjust these nodes. To handle this, the `Node` class now has a `create()` method that should be called on the first node to join the network.
+
+#### Execution
+
+```
+# Unit tests
+pytest tests/integration/test_networked_node.py -k test_stabilize
+pytest tests/test_node.py -k test_create
+pytest tests/test_node.py -k test_chord_virtual_nodes
+pytest tests/test_node.py -k test_virtual_nodes
+
+# CLI
+
+## Start the first node with 1 virtual node
+python chord/node.py create 197 tcp://127.0.0.1 --internal-port 5555 --external-port 5556 --stabilize-interval 20 --fix-fingers-interval 12  --virtual-nodes vnode_194:194
+ 
+## Start the second node with 1 virtual node
+python chord/node.py join 227 tcp://10.0.0.2 --internal-port 5555 --external-port 5556 --stabilize-interval 20 --fix-fingers-interval 12 --known-endpoint tcp://10.0.0.1:5555 --known-name 197 --virtual-nodes vnode_107:107
+
+## Shut down the first node
+python chord/node.py shutdown 197 tcp://127.0.0.1 --internal-port 5555
+
+## Run on mininet
+sudo python run_chord.py 10 --nodes-per-host 2
+
+## Evaluate load
+python chord/util/evaluate_logs.py logs/chord_1624890931.7214227_15_10_10.log --load-statistics 
+python chord/util/evaluate_logs.py logs/chord_1624847263.2324307_15_10_10.log --load-statistics
+```
+
+_Note that evaluating the finger errors on these logs is not useful. The runs generating them did not give the networks time to stabilize._
+
+#### Results
+
+```
+# Load statistics for 20 virtual nodes
+Evaluating 20 nodes
+Average load: 25.6
+Standard deviation: 13.898041428760944
+
+# Load statisitics for 200 virtual nodes
+Evalutating 200 nodes
+Average load: 25.6
+Standard deviation: 2.1186998109427604
+```
+
+The first calculation is based on a network with 10 'physical' nodes each hosting 2 virtual nodes. The second is based on a network with 10 'physical' nodes each hosting 20 virtual nodes. The average is the same because in both cases the total number of keys hosted by the network, i.e. the numerator in the average, and the number of hosts are the same. However, the standard deviation in the second is significantly less showing that there is less variation in the number of keys hosted by a physical node when there are more virtual nodes. In other words virtual nodes distribute the keys better which means that the load is balanced better.  With this type of load balancing, if clients access keys approximately equally, each host should receive a similar number of requests.
+
+This does not help load balancing if there is some set of keys that is accessed much more than others. In that case replicating keys across several hosts, i.e. read replicas, can help to balance the load. When the data is replicated across multiple hosts, any of those hosts can respond to requests for the data and reduce the number of requests the primary host needs to respond to.
+
+## Troubleshooting
+
+#### Nothing prints to the logs from `run_chord.py`
+Try running command locally and see what errors arise
 
 ## TODO
 
@@ -320,13 +401,18 @@ When running on mininet, set the log level to INFO in `chord/util.py` to see the
 - [x] `join()` fails if found successor has same id as joining node
 - [ ] Add code to get commands from clients
 - [ ] Add `pytest-mock` to `requirements.txt`
-- [ ] Testing specify id that acts like a hash to avoid collisions in small address space
+- [x] Testing specify id that acts like a hash to avoid collisions in small address space
 - [x] Accept port for router socket. Needs to be bound before dealer binds to random port
 - [ ] Main thread sends exit message to pair sockets. Pair polls - this is the only async message they receive. What happens if they get exit message when waiting for other message?
 - [ ] Investigate why some nodes hang on `context.destroy()`
+- [ ] Add generator for virtual node keys
+- [x] Add virtual nodes to cli
+- [x] Add chord node type to cli
 
 #### Low Priority (Code Quality)
 
+- [ ] Exit Command __eq__ explanation
+- [ ] Add execute to ExitCommand
 - [ ] Use timers rather than threads sleeping for stabilize and fix fingers
 - [ ] Add `run_chord.py` options to set stabilize and fix fingers intervals
 - [ ] `Command.execute()` could share more code between subclasses

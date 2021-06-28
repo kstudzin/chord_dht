@@ -183,10 +183,10 @@ def test_virtual_nodes(mock_zmq):
 
 
 @mock.patch('chord.node.zmq')
-def test_virtual_nodes(mock_zmq):
+def test_chord_virtual_nodes(mock_zmq):
     v_nodes = {'v_node_0': 1,
                'v_node_1': 2}
-    node = Node('node_0', 160, 'tcp://127.0.0.1', '5556', '5555', v_nodes)
+    node = ChordNode('node_0', 160, 'tcp://127.0.0.1', '5556', '5555', v_nodes)
 
     assert node.digest_id == 160
     assert len(node.virtual_nodes) == 3

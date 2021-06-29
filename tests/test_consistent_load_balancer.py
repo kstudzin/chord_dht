@@ -1,6 +1,13 @@
+import pytest
 import sortedcontainers
+from sortedcontainers import SortedDict
 
 from chord import consistent_load_balancer
+
+
+@pytest.fixture(autouse=True)
+def clear_server_list():
+    consistent_load_balancer.servers = SortedDict()
 
 
 def test_adding_server():

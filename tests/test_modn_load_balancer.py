@@ -1,4 +1,11 @@
+import pytest
+
 from chord import modn_load_balancer, server
+
+
+@pytest.fixture(autouse=True)
+def clear_server_list():
+    modn_load_balancer.server_list = []
 
 
 def test_adding_server():

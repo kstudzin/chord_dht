@@ -4,9 +4,11 @@ This file contains the code for chord nodes before adding ZMQ.
 
 '''
 import argparse
+import json
 import pprint
 import statistics
 import logging
+import sys
 
 from sortedcontainers import SortedDict
 from hash import hash_value, NUM_BITS
@@ -233,7 +235,7 @@ def config_parser():
                         help='determines which finger tables to print if \'fingers\' is an action')
     parser.add_argument('--joining', '-j', type=int, default=1, metavar='NUM_JOINING',
                         help='number of servers to join original network if \'join\' is an action')
-    parser.add_argument('--no-formatting', action='store_const', const=print, default=pp.pprint,
+    parser.add_argument('--no-formatting', action='store_true',
                         help='print raw data without formatting')
 
     node_type_group = parser.add_mutually_exclusive_group()
@@ -246,9 +248,9 @@ def config_parser():
     return parser
 
 
-def main():
+def main(output, args):
     parser = config_parser()
-    args = parser.parse_args()
+    args = parser.parse_args(args)
 
     num_nodes = args.num_nodes
     num_keys = args.num_keys
@@ -257,7 +259,7 @@ def main():
     action = args.action
     finger_tables = args.finger_tables
     num_joining = args.joining
-    printer = args.no_formatting
+    indent = None if args.no_formatting else 4
 
     # Retrieve first non None value
     node_type = next(node_type
@@ -273,31 +275,31 @@ def main():
     # Perform actions
     if 'hops' in action:
         avg_hops = run_experiment(nodes, keys)
-        print(f"Average hops with {len(nodes)} nodes is {avg_hops}")
+        print(f"Average hops with {len(nodes)} nodes is {avg_hops}", file=output)
 
     if 'network' in action:
-        print("Nodes in the network: ")
-        printer(node_table(nodes))
+        print("Nodes in the network: ", file=output)
+        print(json.dumps(node_table(nodes), indent=indent), file=output)
 
     if 'fingers' in action:
         tables_list = nodes if 'all' == finger_tables else [nodes[0], nodes[-1]]
 
         for i, table in enumerate(tables_list):
-            print(f"Finger table for node \"{table.get_name()}\": ")
-            printer(finger_table(table))
+            print(f"Finger table for node \"{table.get_name()}\": ", file=output)
+            print(json.dumps(finger_table(table), indent=indent), file=output)
 
     if 'join' in action:
-        print(f'Original node ids: {hashes}')
+        print(f'Original node ids: {hashes}', file=output)
         new, updated = add_nodes(nodes_map, num_joining, node_type)
 
-        print(f"\nFinger table(s) for new nodes:")
+        print(f"\nFinger table(s) for new nodes:", file=output)
         for new_node in new:
-            printer(finger_table_links(new_node))
+            print(json.dumps(finger_table_links(new_node), indent=indent), file=output)
 
-        print(f'\nFinger table(s) for key updated nodes:')
+        print(f'\nFinger table(s) for key updated nodes:', file=output)
         for updated_node in updated:
-            printer(finger_table_links(updated_node))
+            print(json.dumps(finger_table_links(updated_node), indent=indent), file=output)
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.stdout, sys.argv[1:])

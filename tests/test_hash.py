@@ -1,22 +1,6 @@
-import os
-import pathlib
-import subprocess
+import io
 
-import pytest
-
-from chord.hash import hash_value
-
-
-@pytest.fixture(autouse=True)
-def chdir():
-    parent = pathlib.Path(__file__).parent.parent.absolute()
-    chord = os.path.join(parent, 'chord')
-    os.chdir(chord)
-
-
-def run_cmd(cmd):
-    actual = subprocess.check_output(cmd)
-    return actual.decode('utf-8').strip()
+from chord.hash import hash_value, main
 
 
 def test_hash():
@@ -27,8 +11,9 @@ def test_hash():
 
 
 def test_hash_cli():
-    cmd = ["python", "hash.py", "Hello, world!"]
+    cmd = ["Hello, world!"]
     expected = "Value \"Hello, world!\" has digest \"108\""
+    actual = io.StringIO()
 
-    actual = run_cmd(cmd)
-    assert actual == expected
+    main(actual, cmd)
+    assert actual.getvalue().strip() == expected

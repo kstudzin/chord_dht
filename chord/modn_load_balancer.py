@@ -2,13 +2,13 @@
 
 """
 import argparse
-import pprint
+import json
+import sys
 
 from util import generate_keys
 from hash import hash_value
 from server import Server
 
-pp = pprint.PrettyPrinter()
 
 server_name_fmt = "server_{id}"
 server_list = []
@@ -47,20 +47,20 @@ def config_parser():
     parser.add_argument('num_keys', type=int, help='number of keys to build')
     parser.add_argument('--additional', '-a', type=int, default=1,
                         help='number of servers to add')
-    parser.add_argument('--no-formatting', action='store_const', const=print, default=pp.pprint,
+    parser.add_argument('--no-formatting', action='store_true',
                         help='print raw data without formatting')
 
     return parser
 
 
-def main():
+def main(output, args):
     parser = config_parser()
-    args = parser.parse_args()
+    args = parser.parse_args(args)
 
     num_servers = args.num_servers
     num_keys = args.num_keys
     additional = args.additional
-    printer = args.no_formatting
+    indent = None if args.no_formatting else 4
 
     build_server_list(num_servers)
     orig_length = len(server_list)
@@ -77,15 +77,15 @@ def main():
     changes = calculate_change(result1, result2)
 
     # Print results
-    print(f"\nMapping of keys to server hosting key with {orig_length} servers:")
-    printer(result1)
+    print(f"\nMapping of keys to server hosting key with {orig_length} servers:", file=output)
+    print(json.dumps(result1, indent=indent, default=vars), file=output)
 
-    print(f"\nMapping of keys to server hosting key with {len(server_list)} servers:")
-    printer(result2)
+    print(f"\nMapping of keys to server hosting key with {len(server_list)} servers:", file=output)
+    print(json.dumps(result2, indent=indent, default=vars), file=output)
 
-    print(f"\n A total of {len(changes)} out of {len(keys)} keys have changed hosts:")
-    printer(changes)
+    print(f"\n A total of {len(changes)} out of {len(keys)} keys have changed hosts:", file=output)
+    print(json.dumps(changes, indent=indent), file=output)
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.stdout, sys.argv[1:])

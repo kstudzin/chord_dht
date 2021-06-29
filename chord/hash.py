@@ -21,6 +21,10 @@ def hash_value(value):
     return md5_hash.digest()[0]
 
 
+def main(output, args):
+    value = ' '.join(args)
+    print(f"Value \"{value}\" has digest \"{hash_value(value)}\"", file=output)
+
+
 if __name__ == '__main__':
-    value = ' '.join(sys.argv[1:])
-    print(f"Value \"{value}\" has digest \"{hash_value(value)}\"")
+    main(sys.stdout, sys.argv[1:])

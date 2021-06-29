@@ -7,7 +7,7 @@ import zmq
 from pytest_mock import mocker
 
 from chord.hash import NUM_BITS
-from chord.node import Node, Command, FindSuccessorCommand, ChordNode, RoutingInfo
+from chord.node import Node, Command, FindSuccessorCommand, ChordNode, RoutingInfo, VirtualNode
 
 
 @mock.patch('chord.node.zmq')
@@ -279,3 +279,22 @@ def test_create(mock_zmq):
     assert v_node.predecessor.get_digest() == 234
     assert v_node.predecessor.get_address() == 'tcp://127.0.0.1:5555'
     assert v_node.predecessor.get_parent() == 160
+
+
+def test_next_finger_key():
+    v_node = VirtualNode('vnode_1', 10, 235, 'tcp://127.0.0.1:5555')
+
+    next_key = v_node.next_finger_key()
+    assert next(next_key) == 11
+    assert next(next_key) == 12
+    assert next(next_key) == 14
+    assert next(next_key) == 18
+    assert next(next_key) == 26
+    assert next(next_key) == 42
+    assert next(next_key) == 74
+    assert next(next_key) == 138
+
+    with pytest.raises(StopIteration):
+        next(next_key)
+
+

@@ -63,6 +63,10 @@ class VirtualNode:
     def find_next_node(self, digest):
         return self.successor
 
+    def next_finger_key(self):
+        for i in range(NUM_BITS):
+            yield (self.get_digest() + pow(2, i)) % (pow(2, NUM_BITS) - 1)
+
     def notify(self, other):
         logging.debug(f'Node {self.routing_info.digest} notified by node {other.digest}')
         if not self.predecessor \
@@ -326,14 +330,9 @@ class Node:
         for v_node in self.virtual_nodes.values():
             logging.debug(f"Building finger table for {v_node.name} (Digest: {v_node.get_digest()})")
 
-            i = 0
-            next_key = (v_node.get_digest() + pow(2, i)) % (pow(2, NUM_BITS) - 1)
-            while i < NUM_BITS:
+            for i, next_key in enumerate(v_node.next_finger_key()):
                 self._find_successor(pair, next_key, v_node.routing_info, i)
                 logging.debug(f"  Found finger {i} is successor({next_key}) = {v_node.fingers[i]}")
-
-                i += 1
-                next_key = (v_node.get_digest() + pow(2, i)) % (pow(2, NUM_BITS) - 1)
 
     @staticmethod
     def _find_successor(pair, digest, initiator, index):

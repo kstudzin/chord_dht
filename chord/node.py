@@ -19,6 +19,9 @@ from hash import NUM_BITS, hash_value
 # Networked Chord Implementation
 # -----------------------------------------------------------------------------
 
+STABILIZE_WAIT = 10
+FIX_FINGERS_WAIT = 10
+
 
 class VirtualNode:
 
@@ -134,6 +137,7 @@ class Node:
         # ZMQ sockets
         self.context = zmq.Context()
         self.router = self.context.socket(zmq.ROUTER)
+        self.router.setsockopt(zmq.LINGER, 0)
 
         if external_port:
             self.external_endpoint = endpoint_fmt.format(address, external_port)
@@ -144,6 +148,7 @@ class Node:
 
         identity = struct.pack('i', self.digest_id)
         self.receiver = self.context.socket(zmq.DEALER)
+        self.receiver.setsockopt(zmq.LINGER, 0)
         self.receiver.setsockopt(zmq.IDENTITY, identity)
 
         if internal_port:
@@ -186,45 +191,6 @@ class Node:
 
     def get_virtual_node(self, virtual_node_digest: int) -> VirtualNode:
         return self.virtual_nodes[virtual_node_digest]
-
-    def fix_fingers_loop(self, context, interval):
-        pair = context.socket(zmq.PAIR)
-        pair.connect(self.fix_fingers_address)
-
-        try:
-            while True:
-                self._init_fingers(pair)
-                time.sleep(interval)
-        finally:
-            pair.close()
-
-    def _init_fingers(self, pair):
-        for v_node in self.virtual_nodes.values():
-            logging.debug(f"Building finger table for {v_node.name} (Digest: {v_node.get_digest()})")
-
-            i = 0
-            next_key = (v_node.get_digest() + pow(2, i)) % (pow(2, NUM_BITS) - 1)
-            while i < NUM_BITS:
-                self._find_successor(pair, next_key, v_node.routing_info, i)
-                logging.debug(f"  Found finger {i} is successor({next_key}) = {v_node.fingers[i]}")
-
-                i += 1
-                next_key = (v_node.get_digest() + pow(2, i)) % (pow(2, NUM_BITS) - 1)
-
-    @staticmethod
-    def _find_successor(pair: zmq.Socket, digest: int, initiator: RoutingInfo, index: int):
-        cmd = FindSuccessorCommand()
-        cmd.initiator = initiator
-        cmd.recipient = initiator
-        cmd.return_data = index
-        cmd.search_digest = digest
-
-        pair.send_pyobj(cmd)
-
-        success = pair.recv_pyobj()
-        if not success:
-            logging.error(f'Node {initiator.get_parent()} unable to update finger {index} '
-                          f'on virtual node {initiator.get_digest()}')
 
     def create(self):
         # When there is only one node in the network, the virtual nodes must still be connected
@@ -290,16 +256,25 @@ class Node:
                       f'{virtual_node.successor.get_digest()} at {virtual_node.successor.get_address()}')
         return True
 
-    def stabilize_loop(self, context, interval):
+    def run_stabilize(self, context, interval, shutdown_event):
         pair = context.socket(zmq.PAIR)
+        pair.setsockopt(zmq.LINGER, 0)
         pair.connect(self.stabilize_address)
 
         try:
-            while True:
+            while not shutdown_event.is_set():
+                logging.debug(f'SHUTDOWN Node {self.digest_id} running  _stabilize')
                 self._stabilize(pair)
+
+                logging.debug(f'SHUTDOWN Node {self.digest_id} going to sleep')
                 time.sleep(interval)
+
+                logging.debug(f'SHUTDOWN Node {self.digest_id} waking up')
         finally:
+            logging.debug(f'SHUTDOWN Node {self.digest_id} closing pair')
             pair.close()
+
+        logging.debug(f'SHUTDOWN Node {self.digest_id} exiting _stabilize')
 
     def _stabilize(self, pair):
         logging.debug(f'Node {self.digest_id} running stabilize')
@@ -320,10 +295,15 @@ class Node:
         # has been updated before continuing with the stabilization protocol because the next step
         # involves notifying the new successor of the current nodes existence. If we don't wait for this
         # acknowledgement, we may end up notifying the old successor
-        success = pair.recv_pyobj()
-        if not success:
-            logging.warning(f'Node {v_node.get_parent()} unable to update successor for '
-                            f'virtual node {v_node.get_digest()}')
+        if pair.poll(STABILIZE_WAIT, zmq.POLLIN) == zmq.POLLIN:
+            success = pair.recv_pyobj()
+            if not success:
+                logging.warning(f'Node {v_node.get_parent()} unable to update successor for '
+                                f'virtual node {v_node.get_digest()}')
+        else:
+            # TODO implement successor lists to handle cases where successor fails
+            logging.warning(f'Node {v_node.get_parent()}, Virtual Node {v_node.get_digest()} stabilize did not receive '
+                            f'response from successor in {STABILIZE_WAIT} seconds. Continuing')
 
     @staticmethod
     def _notify_successor(pair, v_node):
@@ -337,14 +317,61 @@ class Node:
         # processes because it does not send information back to the initiating node. We make notify asynchronous
         # because we don't want to add network traffic just for the purpose of being synchronous.
 
+
+    def run_fix_fingers(self, context, interval, shutdown_event):
+        pair = context.socket(zmq.PAIR)
+        pair.setsockopt(zmq.LINGER, 0)
+        pair.connect(self.fix_fingers_address)
+
+        try:
+            while not shutdown_event.is_set():
+                self._fix_fingers(pair)
+                time.sleep(interval)
+        finally:
+            pair.close()
+
+    def _fix_fingers(self, pair):
+        for v_node in self.virtual_nodes.values():
+            logging.debug(f"Building finger table for {v_node.name} (Digest: {v_node.get_digest()})")
+
+            i = 0
+            next_key = (v_node.get_digest() + pow(2, i)) % (pow(2, NUM_BITS) - 1)
+            while i < NUM_BITS:
+                self._find_successor(pair, next_key, v_node.routing_info, i)
+                logging.debug(f"  Found finger {i} is successor({next_key}) = {v_node.fingers[i]}")
+
+                i += 1
+                next_key = (v_node.get_digest() + pow(2, i)) % (pow(2, NUM_BITS) - 1)
+
+    @staticmethod
+    def _find_successor(pair, digest, initiator, index):
+        cmd = FindSuccessorCommand()
+        cmd.initiator = initiator
+        cmd.recipient = initiator
+        cmd.return_data = index
+        cmd.search_digest = digest
+
+        pair.send_pyobj(cmd)
+
+        if pair.poll(STABILIZE_WAIT, zmq.POLLIN) == zmq.POLLIN:
+            success = pair.recv_pyobj()
+            if not success:
+                logging.error(f'Node {initiator.get_parent()} unable to update finger {index} '
+                              f'on virtual node {initiator.get_digest()}')
+        else:
+            logging.warning(f'Node {initiator.get_parent()}, Virtual Node {initiator.get_digest()}: fix fingers did '
+                            f'not receive response in {FIX_FINGERS_WAIT} seconds. Continuing.')
+
     def run(self, stabilize_interval=5, fix_fingers_interval=7):
         logging.info(f'Starting loop for node {self.digest_id}')
         logging.info(f'Node {self.digest_id} managing virtual nodes: {self.virtual_nodes.keys()}')
 
         stability = self.context.socket(zmq.PAIR)
+        stability.setsockopt(zmq.LINGER, 0)
         stability.bind(self.stabilize_address)
 
         fix_fingers = self.context.socket(zmq.PAIR)
+        fix_fingers.setsockopt(zmq.LINGER, 0)
         fix_fingers.bind(self.fix_fingers_address)
 
         poller = zmq.Poller()
@@ -352,15 +379,16 @@ class Node:
         poller.register(stability, zmq.POLLIN)
         poller.register(fix_fingers, zmq.POLLIN)
 
+        shutdown_event = threading.Event()
         if stabilize_interval:
-            stability_t = threading.Thread(target=self.stabilize_loop,
-                                           args=[self.context, stabilize_interval],
+            stability_t = threading.Thread(target=self.run_stabilize,
+                                           args=[self.context, stabilize_interval, shutdown_event],
                                            daemon=True)
             stability_t.start()
 
         if fix_fingers_interval:
-            fix_fingers_t = threading.Thread(target=self.fix_fingers_loop,
-                                             args=[self.context, fix_fingers_interval],
+            fix_fingers_t = threading.Thread(target=self.run_fix_fingers,
+                                             args=[self.context, fix_fingers_interval, shutdown_event],
                                              daemon=True)
             fix_fingers_t.start()
 
@@ -371,6 +399,8 @@ class Node:
                 socks = dict(poller.poll())
                 received_exit = self.process_input(socks, stability, fix_fingers)
                 if received_exit:
+                    shutdown_event.set()
+                    # TODO notify successors and predecessors of known departure
                     break
 
             logging.info(f'Node {self.digest_id} shutting down...')
@@ -378,7 +408,16 @@ class Node:
 
         finally:
             logging.debug(f'Node {self.digest_id} destroying context...')
-            self.context.destroy()
+
+            fix_fingers_t.join()
+            stability_t.join()
+            fix_fingers.close()
+            stability.close()
+
+            self.receiver.close()
+            self.router.close()
+            self.context.term()
+
             self.shutdown = True
 
         logging.info(f'Node {self.digest_id} says Goodbye!')
@@ -393,7 +432,6 @@ class Node:
 
             if command == EXIT_COMMAND:
                 logging.debug(f'Node {self.digest_id} received EXIT message. Node shutting down.')
-                # TODO send exit message to pair sockets
                 return True
 
             # Process the command
@@ -546,6 +584,8 @@ class FindSuccessorCommand(Command):
         v_node = node.virtual_nodes[self.initiator.digest]
         index = self.return_data
         v_node.fingers[index] = self.recipient
+        if index == 0:
+            v_node.successor = self.recipient
         node.router.connect(self.recipient.address)
         node.connected.add(self.recipient.address)
         return RoutingInfo(address=node.fix_fingers_address)

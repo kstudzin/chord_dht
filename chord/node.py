@@ -19,8 +19,8 @@ from hash import NUM_BITS, hash_value
 # Networked Chord Implementation
 # -----------------------------------------------------------------------------
 
-STABILIZE_WAIT = 10
-FIX_FINGERS_WAIT = 10
+STABILIZE_WAIT = 1000
+FIX_FINGERS_WAIT = 1000
 
 
 class VirtualNode:
@@ -466,7 +466,7 @@ class ChordNode(Node):
 
 
 # TODO extract common logic to command
-# TODO refactor if/else to state command
+# TODO refactor if/else in execute to state pattern
 # TODO optimize requests on the same host
 class Command:
 

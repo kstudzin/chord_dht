@@ -29,7 +29,7 @@ def test_init_fingers(mock_zmq):
     pair.send_pyobj.return_value = None
     pair.recv_pyobj.return_value = {'successor': 163, 'address': 'tcp://127.0.0.1:5555'}
 
-    node._init_fingers(pair)
+    node._fix_fingers(pair)
     assert node.virtual_nodes[160].fingers == [None] * NUM_BITS
 
 

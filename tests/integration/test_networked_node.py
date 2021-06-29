@@ -71,11 +71,11 @@ def test_join():
 
     fix_pair1 = node1.context.socket(zmq.PAIR)
     fix_pair1.connect(node1.fix_fingers_address)
-    node1._init_fingers(fix_pair1)
+    node1._fix_fingers(fix_pair1)
 
     fix_pair2 = node2.context.socket(zmq.PAIR)
     fix_pair2.connect(node2.fix_fingers_address)
-    node2._init_fingers(fix_pair2)
+    node2._fix_fingers(fix_pair2)
 
     logging.info('Test final state')
     assert v_node1.fingers == [RoutingInfo(163, 163, 'tcp://127.0.0.1:5503'),

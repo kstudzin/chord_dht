@@ -282,6 +282,10 @@ Each socket must be bound to an endpoint and because each node has two sockets, 
 
 Nodes also have 2 sets of PAIR sockets used in the synchronization protocol. These are discussed in the 'Threads' section.
 
+_**Message Flow Diagram**_
+
+![Chord Request Flow (1)](https://user-images.githubusercontent.com/10711838/123801885-ad6b3b00-d8b8-11eb-8719-1afc9e65cc71.png)
+
 _**Socket Initialization**_
 
 Except for the pair sockets used in threads, sockets are instance attributes on the nodes. They are bound in the constructor so that they are available to `join()` before they are used in `run()`. It is key that `join()` is called before `run()` because `join()` needs to communicate with other nodes to initialize the successor on the new nodes.
@@ -340,6 +344,10 @@ When running chord on mininet, there are three settings to consider: the interva
 This iteration adds several new classes. The `VirtualNode` class contains all the information linking a node to other nodes in the network: successor, predecessor, and fingers. Each of these links as well the `VirtualNode` is an instance of `RoutingInfo` which contains information to send messages to a node. Specifically, it has a node's digest, the host node's digest, and the host node's address. One of the virtual nodes will always be the host node. In this case, the digest and parent's digest are the same. `VirtualNode` also contains the methods, such as `find_successor()`, for retrieving and manipulating those links. `ChordVirtualNode` is a subclass that contains the `closest_preceding_finger()` method. As a result of these class, most of the code managing the links between nodes is maintained in the `VirtualNode` class, and the code managing passing messages around the network remains in the `Node` class. One optimization that has not yet been made is to avoid sending messages over the network when one virtual node is looking for information on a virtual node hosted by the same parent node.
 
 Adding virtual nodes required a change in start up procedure. When the host starts, it needs to find the successor for each virtual node. This was not necessary before because there was only one node, but with 2 or more virtual nodes, the nodes should be find their successor within the group. Without this initialization, the synchronization protocols won't properly adjust these nodes. To handle this, the `Node` class now has a `create()` method that should be called on the first node to join the network.
+
+_**Classs Diagram**_
+
+![Class_Diagram](https://user-images.githubusercontent.com/10711838/123802260-1f438480-d8b9-11eb-9984-af04bf2b5704.JPG)
 
 #### Execution
 

@@ -263,18 +263,10 @@ class Node:
 
         try:
             while not shutdown_event.is_set():
-                logging.debug(f'SHUTDOWN Node {self.digest_id} running  _stabilize')
                 self._stabilize(pair)
-
-                logging.debug(f'SHUTDOWN Node {self.digest_id} going to sleep')
                 time.sleep(interval)
-
-                logging.debug(f'SHUTDOWN Node {self.digest_id} waking up')
         finally:
-            logging.debug(f'SHUTDOWN Node {self.digest_id} closing pair')
             pair.close()
-
-        logging.debug(f'SHUTDOWN Node {self.digest_id} exiting _stabilize')
 
     def _stabilize(self, pair):
         logging.debug(f'Node {self.digest_id} running stabilize')
@@ -480,6 +472,9 @@ class Command:
 
     def execute(self, node):
         pass
+
+    def __repr__(self):
+        return f'{type(self).__name__}: {vars(self)}'
 
 
 class ExitCommand(Command):

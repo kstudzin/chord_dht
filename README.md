@@ -31,6 +31,8 @@ Run tests using `pytest` from the project root or `tests` directories. All docum
 | Synchronization Protocol | `chord/directchord.py` |
 | Run on Mininet | `chord/node.py` |
 | Virtual Nodes | `chord/node.py` |
+| Cryptographic vs. Non-Cryptographic Hashes | `README.md` |
+| How Chord Relates to B-trees | `README.md` |
 
 ### Chord Worksheet
 
@@ -396,6 +398,54 @@ Standard deviation: 2.1186998109427604
 The first calculation is based on a network with 10 'physical' nodes each hosting 2 virtual nodes. The second is based on a network with 10 'physical' nodes each hosting 20 virtual nodes. The average is the same because in both cases the total number of keys hosted by the network, i.e. the numerator in the average, and the number of hosts are the same. However, the standard deviation in the second is significantly less showing that there is less variation in the number of keys hosted by a physical node when there are more virtual nodes. In other words virtual nodes distribute the keys better which means that the load is balanced better.  With this type of load balancing, if clients access keys approximately equally, each host should receive a similar number of requests.
 
 This does not help load balancing if there is some set of keys that is accessed much more than others. In that case replicating keys across several hosts, i.e. read replicas, can help to balance the load. When the data is replicated across multiple hosts, any of those hosts can respond to requests for the data and reduce the number of requests the primary host needs to respond to.
+
+### Cryptographic vs. Non-Cryptographic Hashes
+
+Cryptographic hashes are used in situations where privacy is a concern, such as when storing passwords. Because they deal with sensitive information, they have several requirements they must meet:
+
+- _**Deterministic**_: the same value must always hash to the same digest
+- _**Quick**_: must not take long to compute
+- _**Pre-image attack resistant**_: given a digest, it is impossible to calculate the input that generated it
+- _**Avalanche effect**_: small changes in the input lead to large changes in the digest
+- _**Collision resistant**_: two different values should not have the same digest
+
+This ensures that the information is protected from attack.
+
+Non-cryptographic hashes don't need to be as concerned with all of these properties because they are not protecting sensitive information. Instead they can be optimized for other applications. One common application for non-cryptographic hashes is hash tables. In hash tables such as chord a primary goal is distribution of output hashes. In a local hash table a well distributed hash means that items are evenly distributed among buckets. In consistent hashing a well distributed hash means that the number of keys that any one node is responsible for is approximately equal. This helps with load balancing because, assuming requests for keys is also well distributed, each node will receive approximately the same number of requests. Additionally, fewer, less strict requirements often mean that non-cryptographic hashes can be computed faster.
+
+#### Resources
+https://dadario.com.br/cryptographic-and-non-cryptographic-hash-functions/
+https://www.youtube.com/watch?v=siV5pr44FAI
+https://crypto.stackexchange.com/a/43520
+https://softwareengineering.stackexchange.com/a/145633/392415
+https://stackoverflow.com/a/11901654/3027632
+
+### How Chord Relates to B-trees
+
+B-trees are a self-balancing tree data structure that generalize binary search trees. While binary search trees can have only 2 child nodes where each node has one key, b-trees can, and should, have multiple children each many keys. In b-trees, the keys on each node are sorted and serve as separators between pointers to children. Like binary search trees, the left child contains keys smaller than the current key, and the right child contains keys larger than the current key. The average search time complexity of b-trees is, like binary search trees, `O(lg n)` where `n` is the number of nodes in the tree. Because b-trees are self-balancing, there is no case where they have `O(n)` search time complexity. 
+
+B-trees and chord have similar origins. Both were discovered by researchers trying to overcome the problems introduced by the size of the datasets they were working on. For b-trees, the data could no longer fit in memory. B-trees store data on disk but overcome the time cost by aligning their elements to the disk's block size to maximize cache hits when reading consecutive elements. For chord, the data is too large for a single computer, so it distributes the data over a network of computers.
+
+Because both b-trees and hashes store data based on a key, they need to be able to retrieve the data via lookup or search. Each does this efficiently by splitting the search space in half with each step. For b-trees the mechanism for traversing large chunks of the search space is the keys stored at each node. These serve a similar purpose as the fingers do in the chord algorithm. Given that both store and retrieve data, have similar applications. B-trees are commonly used as indexes in relational databases, and chord-like algorithms are used as 'indexes' in distributed databases like Apache Cassandra.
+
+A key difference is that b-trees are optimized for reading consecutive keys as in range searches, while chord makes that very difficult. The reason range searches are difficult in chord is that keys are hashed, so two keys that are close will have hashes that are far apart by the design of the hash function. The authors of 'A  practical scalable distributed B-tree' (2007) cite distributed range searches as a motivator for their work.
+
+#### Resources
+- https://www.cs.cornell.edu/courses/cs3110/2012sp/recitations/rec25-B-trees/rec25.html
+- https://youtu.be/TOb1tuEZ2X4
+- https://en.wikipedia.org/wiki/B-tree
+- https://cassandra.apache.org/doc/latest/architecture/dynamo.html
+- Aguilera, Marcos K, Wojciech Golab, and Mehul A Shah. “A Practical Scalable Distributed B-Tree.” Proceedings of the VLDB Endowment 1.1 (2008): 598–609. Web. https://www.hpl.hp.com/techreports/2007/HPL-2007-193.pdf 
+
+### Content Addressable Networks (CAN)
+
+Content addressable networks are a type of distributed hash table whose overlay network forms a d-dimensional torus. For 2 dimensions, this means that the network is a grid with nodes at the intersection of rows and columns where the rows and columns are continuous loops. Each node is responsible for some non-overlapping, convex region in this space. There should be point in the domain that is not the responsiblity of some node in the network. Nodes maintain a list of their neighbors where neighbors are defined as a node whose region overlaps in _d - 1_ dimensions and abuts in one dimension.
+
+When a node joins the network, contacts a node in the network to get a random location. Once the node has a location, it sends a join message to the node currently responsible for the region containing the new node's location. The original node splits its zone and sends the new node a list of its neighbors. Data is inserted into the network and stored on the node whose region contains the data's hash. Hash is a digest of the value to be inserted. To accommodate the multiple dimensions, specific ranges of bits in the digest can be designated to each dimension of the point. When a node leaves, the smallest neighbor becomes responsible for the departed node's region. If the two regions can be merged into a single convex region, they will be. Otherwise one node will be responsible for two regions until the background maintence process balances the regions.
+
+In many ways CANs are a multi-dimensional version of chord. In both approaches nodes are responsible for a set of keys nearby in the address space. To join a network, a node talks to a known entry point node to get the address of the network node it will be close to in the overlay network. The new node lets its new neighbor know it has arrived, and the nearby node hands off some keys it is responsible for to the new node. When a node leaves the network, a nearby node takes over the keys the exiting node was responsible for. In both approaches, each node maintains a list of other nodes it can route queries to. In chord this list includes nodes that are closer on the overlay network and nodes that are further, while in CANs, this list only includes neighbors. Chord nodes do have references to their neighbors, their predecessor and successor, but they are not used for routing.
+
+Even with all of these similarities, there are some differences and usage considerations which choosing a DHT. One consideration is fault tolerance. In addition to routing, CAN nodes' list of neighbors provide fault tolerance. When a chord node's finger is unavailable, chord follows a chain of successors. While it still finds the data, performance is worse. Because CAN nodes have a list of neighbors and multiple neighbors can provide correct routes to the destination, a node can route a lookup through a different neighbor when one is down. Another consideration is scaling. In chord performance scales with the number of nodes in the network, while CAN networks scale with dimensionality. (Both more nodes in chord and higher dimensions in CAN lead to increased fault tolerance). Lastly, there are load balancing considerations. While chord load balancing is largely dependent on the distribution properties of the hash function, CANs are able to dynamically load balance because there are multiple neighbors who could become responsible for a given region.  One example of CAN rebalancing is that after a node leaves the network, neighbors vote so that the smallest region can maintain the newly abandoned region.
 
 ## Troubleshooting
 

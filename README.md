@@ -22,7 +22,7 @@ Run tests using `pytest` from the project root or `tests` directories. All docum
 
 | Task | File |
 |------|------|
-| Chord Worksheet | `worksheet.md` |
+| [Chord Worksheet](#chord-worksheet) | `worksheet.md` |
 | Hash function | `chord/hash.py` |
 | Mod-N load balancer | `chord/modn_load_balancer.py` |
 | Consistent load balancer | `chord/consistent_load_balancer.py` |

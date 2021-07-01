@@ -1,6 +1,6 @@
 # cs6381-assignment2
 
-Chord DHT Implementation
+Chord DHT Implementation fof CS 6381 Distributed Systems
 
 ## Setup
 
@@ -496,46 +496,27 @@ Try running command locally and see what errors arise
 
 ## TODO
 
-#### High Priority (Functional)
+Space for tracking improvements along with inline TODO comments
 
-- [x] `join()` fails if found successor has same id as joining node
-- [ ] Add code to get commands from clients
+#### High Priority
+
+- [ ] Implement data storage and client
 - [ ] Add `pytest-mock` to `requirements.txt`
-- [x] Testing specify id that acts like a hash to avoid collisions in small address space
-- [x] Accept port for router socket. Needs to be bound before dealer binds to random port
-- [ ] ~~Main thread sends exit message to pair sockets. Pair polls - this is the only async message they receive. What happens if they get exit message when waiting for other message?~~ Used Event
-- [x] Investigate why some nodes hang on `context.destroy()`
-- [x] Add generator for virtual node keys
-- [x] Add virtual nodes to cli
-- [x] Add chord node type to cli
 
-#### Low Priority (Code Quality)
+#### Low Priority
 
-- [ ] verify running chord with quiet works
-- [ ] `run_chord.py` check exit status of node. Pipe output to file.
-- [ ] Exit Command __eq__ explanation
-- [ ] Add execute to ExitCommand to notify neighbors? Is raising an exception and sending message in finally more Pythonic? 
-- [ ] ~~Use timers rather than threads sleeping for stabilize and fix fingers~~ Timers were difficult because calling the method recursively, not recreating the pair socket, and close pair socket only  once was challenging if not impossible. Used Events to stop the loop. Maybe could use exception to interrupt sleep?
+- [ ] Are stabilize and fix_fingers run methods pythonic? Being able to interrupt the sleep would be better.
 - [ ] Check if event is set before going to sleep in threads
-- [x] Add `run_chord.py` options to set stabilize and fix fingers intervals
-- [ ] `Command.execute()` could share more code between subclasses
 - [ ] Add optimization to `find_successor()` to see if current node is successor: if predecessor is set, check if the digest is between predecessor and current node
 - [ ] Search for node rather than iterate in `consistent_load_balancer`
-- [ ] Use data frames instead of pretty printing output
+- [ ] Use data frames tables instead of json output
 - [ ] Load balancers share a lot of code and could be consolidated
 - [ ] Make `num_keys` optional in `directchord.py`
 - [ ] Use subparser instead of `--actions` in `directchord.py` 
-- [ ] Validate url formatting
-- [ ] Separate finger node tests and stability tests from `test_networked_node`
-- [ ] Add code to help approximate stabilize and fix fingers intervals as well as time to reach steady state
+- [ ] Validate endpoint formatting
+- [ ] Separate finger node tests and stability tests from `test_networked_node.py`
+- [ ] Add perf timer to measure time spent in stabilize and fix fingers
 - [ ] Messages to pair sockets should allow pair to determine if received message is the expected message.
 - [ ] Add pytest marks to integration tests because they run more slowly than unit tests and shouldn't slow unit tests down
-- [ ] arguments requiring seconds are ints not floats
+- [ ] arguments requiring seconds are ints but should be floats
 
-## Questions
-
-- ~~Should nodes a have reply socket that will send synchronous replies for predecessor requests? No, as the docs note, there is no advantage to router-rep over router-dealer~~
-- ~~What is the use case for POLLOUT? Receiving from multiple sockets~~
-- ~~Only nodes call find successor; clients call get and put. OR nodes call find successor to get the identity of the hosting node and then get data from host directly.~~
-- ~~How does a node know if a found successor message is for it or for a client? How does fix_fingers know which k a found successor is for?~~
-- What happens if 2 nodes with the same digest enter at the same time?

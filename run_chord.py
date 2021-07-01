@@ -11,6 +11,7 @@ from mininet.topo import SingleSwitchTopo, Topo
 
 from chord.hash import NUM_BITS
 
+# TODO starting node should pipe output to a file
 
 name_fmt = 'node_{id}'
 cmd_fmt = 'python chord/node.py {action} {name} tcp://{ip} --internal-port 5555 ' \
@@ -130,10 +131,14 @@ def main():
         print(f'Starting node {name}: {cmd}')
         node.cmd(cmd)
 
+    # TODO - verify that nodes started and inform user
+
     # Allow stabilize and finger node processes to complete
     total_wait = wait_per_node * num_nodes * (num_virtual + 1)
     print(f'Waiting {total_wait} seconds for network to stabilize...')
     time.sleep(total_wait)
+
+    # TODO investigate how to get exit status from the process running the node
 
     # Send shut down commands
     for node, name in node2name.items():

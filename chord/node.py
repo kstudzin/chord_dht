@@ -14,7 +14,6 @@ import zmq
 from util import open_closed, open_open
 from hash import NUM_BITS, hash_value
 
-
 # -----------------------------------------------------------------------------
 # Networked Chord Implementation
 # -----------------------------------------------------------------------------
@@ -312,7 +311,6 @@ class Node:
         # In other words, those are processed synchronously. Notify is different from the other synchronization
         # processes because it does not send information back to the initiating node. We make notify asynchronous
         # because we don't want to add network traffic just for the purpose of being synchronous.
-
 
     def run_fix_fingers(self, context, interval, shutdown_event):
         pair = context.socket(zmq.PAIR)

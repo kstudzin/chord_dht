@@ -131,7 +131,9 @@ def main():
         node.cmd(cmd)
 
     # Allow stabilize and finger node processes to complete
-    time.sleep(wait_per_node * num_nodes * (num_virtual + 1))
+    total_wait = wait_per_node * num_nodes * (num_virtual + 1)
+    print(f'Waiting {total_wait} seconds for network to stabilize...')
+    time.sleep(total_wait)
 
     # Send shut down commands
     for node, name in node2name.items():

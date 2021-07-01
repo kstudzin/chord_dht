@@ -204,7 +204,7 @@ def node_table(nodes):
 
 def finger_table(node):
     fingers = node.fingers
-    table = [{"position": i, "id": finger.get_id(), "name": finger.get_name()}
+    table = [{"k": i + 1, "id": finger.get_id(), "name": finger.get_name()}
              for i, finger in enumerate(fingers)]
     return {"name": node.get_name(), "id": node.get_id(), "fingers": table}
 

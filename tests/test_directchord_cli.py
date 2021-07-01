@@ -69,15 +69,14 @@ def test_chord_network():
 
 def test_naive_fingers():
     cmd = ["10", "100", '--naive', '--action', 'fingers', '--no-formatting']
-    expected = 'Finger table for node "node_3": \n{"name": "node_3", "id": 24, "fingers": [{"position": 0, "id": 32, ' \
-               '"name": "node_2"}, {"position": 1, "id": 32, "name": "node_2"}, {"position": 2, "id": 32, ' \
-               '"name": "node_2"}, {"position": 3, "id": 32, "name": "node_2"}, {"position": 4, "id": 46, ' \
-               '"name": "node_6"}, {"position": 5, "id": 109, "name": "node_4"}, {"position": 6, "id": 109, ' \
-               '"name": "node_4"}, {"position": 7, "id": 160, "name": "node_0"}]}\nFinger table for node "node_5": ' \
-               '\n{"name": "node_5", "id": 244, "fingers": [{"position": 0, "id": 24, "name": "node_3"}, {"position": ' \
-               '1, "id": 24, "name": "node_3"}, {"position": 2, "id": 24, "name": "node_3"}, {"position": 3, ' \
-               '"id": 24, "name": "node_3"}, {"position": 4, "id": 24, "name": "node_3"}, {"position": 5, "id": 24, ' \
-               '"name": "node_3"}, {"position": 6, "id": 109, "name": "node_4"}, {"position": 7, "id": 145, ' \
+    expected = 'Finger table for node "node_3": \n{"name": "node_3", "id": 24, "fingers": [{"k": 1, "id": 32, ' \
+               '"name": "node_2"}, {"k": 2, "id": 32, "name": "node_2"}, {"k": 3, "id": 32, "name": "node_2"}, ' \
+               '{"k": 4, "id": 32, "name": "node_2"}, {"k": 5, "id": 46, "name": "node_6"}, {"k": 6, "id": 109, ' \
+               '"name": "node_4"}, {"k": 7, "id": 109, "name": "node_4"}, {"k": 8, "id": 160, ' \
+               '"name": "node_0"}]}\nFinger table for node "node_5": \n{"name": "node_5", "id": 244, "fingers": [{' \
+               '"k": 1, "id": 24, "name": "node_3"}, {"k": 2, "id": 24, "name": "node_3"}, {"k": 3, "id": 24, ' \
+               '"name": "node_3"}, {"k": 4, "id": 24, "name": "node_3"}, {"k": 5, "id": 24, "name": "node_3"}, ' \
+               '{"k": 6, "id": 24, "name": "node_3"}, {"k": 7, "id": 109, "name": "node_4"}, {"k": 8, "id": 145, ' \
                '"name": "node_8"}]}'
     actual = io.StringIO()
 
@@ -87,15 +86,14 @@ def test_naive_fingers():
 
 def test_chord_fingers():
     cmd = ["10", "100", '--chord', '--action', 'fingers', '--no-formatting']
-    expected = 'Finger table for node "node_3": \n{"name": "node_3", "id": 24, "fingers": [{"position": 0, "id": 32, ' \
-               '"name": "node_2"}, {"position": 1, "id": 32, "name": "node_2"}, {"position": 2, "id": 32, ' \
-               '"name": "node_2"}, {"position": 3, "id": 32, "name": "node_2"}, {"position": 4, "id": 46, ' \
-               '"name": "node_6"}, {"position": 5, "id": 109, "name": "node_4"}, {"position": 6, "id": 109, ' \
-               '"name": "node_4"}, {"position": 7, "id": 160, "name": "node_0"}]}\nFinger table for node "node_5": ' \
-               '\n{"name": "node_5", "id": 244, "fingers": [{"position": 0, "id": 24, "name": "node_3"}, {"position": ' \
-               '1, "id": 24, "name": "node_3"}, {"position": 2, "id": 24, "name": "node_3"}, {"position": 3, ' \
-               '"id": 24, "name": "node_3"}, {"position": 4, "id": 24, "name": "node_3"}, {"position": 5, "id": 24, ' \
-               '"name": "node_3"}, {"position": 6, "id": 109, "name": "node_4"}, {"position": 7, "id": 145, ' \
+    expected = 'Finger table for node "node_3": \n{"name": "node_3", "id": 24, "fingers": [{"k": 1, "id": 32, ' \
+               '"name": "node_2"}, {"k": 2, "id": 32, "name": "node_2"}, {"k": 3, "id": 32, "name": "node_2"}, ' \
+               '{"k": 4, "id": 32, "name": "node_2"}, {"k": 5, "id": 46, "name": "node_6"}, {"k": 6, "id": 109, ' \
+               '"name": "node_4"}, {"k": 7, "id": 109, "name": "node_4"}, {"k": 8, "id": 160, ' \
+               '"name": "node_0"}]}\nFinger table for node "node_5": \n{"name": "node_5", "id": 244, "fingers": [{' \
+               '"k": 1, "id": 24, "name": "node_3"}, {"k": 2, "id": 24, "name": "node_3"}, {"k": 3, "id": 24, ' \
+               '"name": "node_3"}, {"k": 4, "id": 24, "name": "node_3"}, {"k": 5, "id": 24, "name": "node_3"}, ' \
+               '{"k": 6, "id": 24, "name": "node_3"}, {"k": 7, "id": 109, "name": "node_4"}, {"k": 8, "id": 145, ' \
                '"name": "node_8"}]}'
     actual = io.StringIO()
 
@@ -106,16 +104,16 @@ def test_chord_fingers():
 def test_node_joining():
     cmd = ['10', '100', '--chord', '--action', 'join', '--no-formatting']
     expected = 'Original node ids: [24, 32, 46, 109, 145, 150, 160, 163, 241, 244]\n\nFinger table(s) for new ' \
-               'nodes:\n{"name": "node_added_0", "id": 218, "fingers": [{"position": 0, "id": 241, "name": "node_9"}, ' \
-               '{"position": 1, "id": 241, "name": "node_9"}, {"position": 2, "id": 241, "name": "node_9"}, ' \
-               '{"position": 3, "id": 241, "name": "node_9"}, {"position": 4, "id": 241, "name": "node_9"}, ' \
-               '{"position": 5, "id": 24, "name": "node_3"}, {"position": 6, "id": 32, "name": "node_2"}, ' \
-               '{"position": 7, "id": 109, "name": "node_4"}], "successor": 241, "predecessor": 163}\n\nFinger table(' \
-               's) for key updated nodes:\n{"name": "node_1", "id": 163, "fingers": [{"position": 0, "id": 218, ' \
-               '"name": "node_added_0"}, {"position": 1, "id": 218, "name": "node_added_0"}, {"position": 2, ' \
-               '"id": 218, "name": "node_added_0"}, {"position": 3, "id": 218, "name": "node_added_0"}, {"position": ' \
-               '4, "id": 218, "name": "node_added_0"}, {"position": 5, "id": 218, "name": "node_added_0"}, ' \
-               '{"position": 6, "id": 241, "name": "node_9"}, {"position": 7, "id": 46, "name": "node_6"}], ' \
+               'nodes:\n{"name": "node_added_0", "id": 218, "fingers": [{"k": 1, "id": 241, "name": "node_9"}, ' \
+               '{"k": 2, "id": 241, "name": "node_9"}, {"k": 3, "id": 241, "name": "node_9"}, ' \
+               '{"k": 4, "id": 241, "name": "node_9"}, {"k": 5, "id": 241, "name": "node_9"}, ' \
+               '{"k": 6, "id": 24, "name": "node_3"}, {"k": 7, "id": 32, "name": "node_2"}, ' \
+               '{"k": 8, "id": 109, "name": "node_4"}], "successor": 241, "predecessor": 163}\n\nFinger table(' \
+               's) for key updated nodes:\n{"name": "node_1", "id": 163, "fingers": [{"k": 1, "id": 218, ' \
+               '"name": "node_added_0"}, {"k": 2, "id": 218, "name": "node_added_0"}, {"k": 3, ' \
+               '"id": 218, "name": "node_added_0"}, {"k": 4, "id": 218, "name": "node_added_0"}, {"k": ' \
+               '5, "id": 218, "name": "node_added_0"}, {"k": 6, "id": 218, "name": "node_added_0"}, ' \
+               '{"k": 7, "id": 241, "name": "node_9"}, {"k": 8, "id": 46, "name": "node_6"}], ' \
                '"successor": 218, "predecessor": 160}'
     actual = io.StringIO()
 

@@ -460,6 +460,8 @@ Suppose `p` keys have been assigned to `q` buckets, and then a new bucket is add
 
 The algorithm discussed above scales linearly with the number of buckets. However, the authors achieve logarithmic scaling by deriving a closed formula to calculate the next jump. The key insight to predicting a jump is noticing that for every iteration `i`,`b_i = b_(i-1)` except if a jump has just been made. The goal of the logarithmic version is to only run iterations where `b_i != b_(i-1)`. The authors point out a formula for calculating the probability that two iterations have the same result using the property discussed above. Further, they note that at each step in the algorithm  for candidate bucket `b`, and iteration index `i`, `i >= b` if and only if `b` did not jump in the `i-th` iteration. The chart below steps through the algorithm to demonstrate this property. Now we have identified two indicators that a jump has occurred. At this point the closed formula for the next bucket is derived by setting the probabilities of our two indicators equal to each other and solving for `i`.
 
+![Jump Hash Linear Algorithm Execution](https://user-images.githubusercontent.com/10711838/124059346-f0ccc300-d9f8-11eb-9175-ce9c35087447.png)
+
 ## Troubleshooting
 
 #### Nothing prints to the logs from `run_chord.py`

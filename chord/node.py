@@ -647,7 +647,7 @@ def handle_new_node(name, address, external_port, internal_port, action,
     node_t = threading.Thread(target=node.run, args=[stabilize_interval, fix_fingers_interval])
     node_t.start()
 
-    return num_added, node
+    return node, node_t
 
 
 def virtual_node(v_node):
@@ -736,17 +736,16 @@ def main():
 
     if action == 'create' or action == 'join':
 
-        num_nodes, node = handle_new_node(name, address, external_port, internal_port, action,
-                                          known_endpoint, known_name, stabilize_interval,
-                                          fix_fingers_interval, node_type, hash_func, virtual_nodes)
+        node, node_t = handle_new_node(name, address, external_port, internal_port, action,
+                                       known_endpoint, known_name, stabilize_interval,
+                                       fix_fingers_interval, node_type, hash_func, virtual_nodes)
 
-        print(f'Node {node.name} joined network with {num_nodes - 1} virtual node(s)')
+        print(f'Node {node.name} joined network with {len(node.virtual_nodes)} virtual node(s)')
 
-        while not quiet:
-            pp.pprint(finger_table_links(node))
-            if node.shutdown:
-                break
-            time.sleep(30)
+        while node_t.is_alive():
+            if not quiet:
+                pp.pprint(finger_table_links(node))
+            node_t.join(30)
 
     elif action == 'shutdown':
 

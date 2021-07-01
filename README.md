@@ -23,19 +23,19 @@ Run tests using `pytest` from the project root or `tests` directories. All docum
 | Task | File |
 |------|------|
 | [Chord Worksheet](#chord-worksheet) | `worksheet.md` |
-| Hash function | `chord/hash.py` |
-| Mod-N load balancer | `chord/modn_load_balancer.py` |
-| Consistent load balancer | `chord/consistent_load_balancer.py` |
-| Naive routing | `chord/directchord.py` |
-| Build finger tables | `chord/directchord.py` |
-| Chord routing | `chord/directchord.py` |
-| Synchronization Protocol | `chord/directchord.py` |
-| Run on Mininet | `chord/node.py` |
-| Virtual Nodes | `chord/node.py` |
-| Cryptographic vs. Non-Cryptographic Hashes | `README.md` |
-| How Chord Relates to B-trees | `README.md` |
-| Content Addressable Networks | `README.md` |
-| Jump Hash | `README.md` |
+| [Hash Function](#hash-function) | `chord/hash.py` |
+| [Mod-N Load Balancer](#mod-n-load-balancer) | `chord/modn_load_balancer.py` |
+| [Consistent Load Balancer](#consistent-load-balancer) | `chord/consistent_load_balancer.py` |
+| [Naive Routing](#naive-routing) | `chord/directchord.py` |
+| [Build Finger Tables](#build-finger-tables) | `chord/directchord.py` |
+| [Chord Routing](#chord-routing) | `chord/directchord.py` |
+| [Synchronization Protocol](#synchronization-protocol) | `chord/directchord.py` |
+| [Run Chord on Mininet](#run-chord-on-mininet) | `chord/node.py` |
+| [Virtual Nodes](#virtual-nodes) | `chord/node.py` |
+| [Cryptographic vs. Non-Cryptographic Hashes](#cryptographic-vs-non-cryptographic-hashes) | `README.md` |
+| [How Chord Relates to B-trees](#how-chord-relates-to-b-trees) | `README.md` |
+| [Content Addressable Networks](#content-addressable-networks-can) | `README.md` |
+| [Jump Hash](#jump-hashes) | `README.md` |
 
 ### Chord Worksheet
 
@@ -109,7 +109,7 @@ python chord/consistent_load_balancer.py 50 10 --additional 1
 
 1 out of 10 keys were assigned to different servers after adding an additional server
 
-### Naive Chord Routing
+### Naive Routing
 
 **File:** `chord/directchord.py` <br>
 **Python structure:** `chord.directchord.DirectNode.find_successor()` <br>

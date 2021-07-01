@@ -689,9 +689,8 @@ def config_parser():
 
     parser.add_argument('--virtual-nodes', '-vn', type=virtual_node, nargs='+', default=[],
                         metavar='node_name:digest',
-                        help='Number of virtual nodes to run on this instance. Also referred to as the'
-                             'weight of the node and should correspond to how powerful the server is. Virtual nodes'
-                             'listed are added in addition to the host node')
+                        help='Space separated list of virtual nodes to run. Each virtual node is identified by a colon '
+                             'separated string containing its node name and digest ')
     parser.add_argument('--real-hashes', '-rh', action='store_const', const=hash_value,
                         help='By default, hashes are artificially generated to avoid duplicates in '
                              'the small address space. This option allows using real hashes.')

@@ -298,8 +298,8 @@ class Node:
                                 f'virtual node {v_node.get_digest()}')
         else:
             # TODO implement successor lists to handle cases where successor fails
-            logging.warning(f'Node {v_node.get_parent()}, Virtual Node {v_node.get_digest()} stabilize did not receive '
-                            f'response from successor in {STABILIZE_WAIT} seconds. Continuing')
+            logging.debug(f'Node {v_node.get_parent()}, Virtual Node {v_node.get_digest()} stabilize did not receive '
+                          f'response from successor in {STABILIZE_WAIT} milliseconds. Continuing')
 
     @staticmethod
     def _notify_successor(pair, v_node):
@@ -350,8 +350,8 @@ class Node:
                 logging.error(f'Node {initiator.get_parent()} unable to update finger {index} '
                               f'on virtual node {initiator.get_digest()}')
         else:
-            logging.warning(f'Node {initiator.get_parent()}, Virtual Node {initiator.get_digest()}: fix fingers did '
-                            f'not receive response in {FIX_FINGERS_WAIT} seconds. Continuing.')
+            logging.debug(f'Node {initiator.get_parent()}, Virtual Node {initiator.get_digest()}: fix fingers did '
+                          f'not receive response in {FIX_FINGERS_WAIT} milliseconds. Continuing.')
 
     def run(self, stabilize_interval=5, fix_fingers_interval=7):
         logging.info(f'Starting loop for node {self.digest_id}')

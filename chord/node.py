@@ -18,6 +18,8 @@ from hash import NUM_BITS, hash_value
 # Networked Chord Implementation
 # -----------------------------------------------------------------------------
 
+# Define milliseconds PAIR sockets should wait for main thread to acknowledge
+# command is complete
 STABILIZE_WAIT = 1000
 FIX_FINGERS_WAIT = 1000
 
@@ -62,6 +64,7 @@ class VirtualNode:
     def find_next_node(self, digest):
         return self.successor
 
+    # TODO - precompute these indexes
     def next_finger_key(self):
         for i in range(NUM_BITS):
             yield (self.get_digest() + pow(2, i)) % (pow(2, NUM_BITS) - 1)
@@ -201,12 +204,10 @@ class Node:
         # can't use the join call, but because all of the the nodes in the network are on the
         # current machine, we can calculate the successors locally.
         #
-        # It is also possible to do this calculation in the constructor but that would mean we
-        # need to do it for every node. But it does not make sense to do this calculation for
-        # nodes after this because when they join the network for real, they will then need to find
-        # they're true successor in the network.
+        # Keep computation out of constructor because it only needs to be done for one node in the network
 
-        if len(self.virtual_nodes) > 2:
+        # If there is 1 node, then the successor and predecessor set in the constructor are correct
+        if len(self.virtual_nodes) > 1:
             node_iter = iter(self.virtual_nodes.values())
             node1 = next(node_iter)
             node2 = next(node_iter)
@@ -233,11 +234,11 @@ class Node:
             if not success:
                 self.virtual_nodes.pop(v_node.get_digest())
 
-        # TODO - if no virtual nodes, shutdown
+        # TODO - log an error if there are no virtual nodes at this point
 
         return len(self.virtual_nodes)
 
-    def join_vnode(self, known_id: int, known_address: str, virtual_node: VirtualNode):
+    def join_vnode(self, known_id, known_address, virtual_node):
         recipient = RoutingInfo(known_id, known_id, known_address)
         cmd = FindSuccessorCommand(search_digest=virtual_node.get_digest(),
                                    initiator=virtual_node.routing_info,
@@ -246,7 +247,7 @@ class Node:
         self.route_result(known_address, known_id, cmd)
 
         # Block waiting for result. We can't start execution without know our successor
-        # Because loop has not started, we can wait for the message here
+        # Because loop has not started, socket is not being used. We can wait for the message here
         result = self.receiver.recv_pyobj()
         virtual_node.successor = result.recipient
 
@@ -308,9 +309,9 @@ class Node:
         # Note that other synchronization processes (updating successor, fixing fingers) wait for a response.
         # Those protocols require information to be sent back to the initiating node for processing. Once that
         # processing is done, the node sends a message to the thread the task is complete and the task movies on.
-        # In other words, those are processed synchronously. Notify is different from the other synchronization
-        # processes because it does not send information back to the initiating node. We make notify asynchronous
-        # because we don't want to add network traffic just for the purpose of being synchronous.
+        # Notify is different from the other synchronization processes because it does not send information back to
+        # the initiating node. We make notify asynchronous because we don't want to add network traffic just for
+        # the purpose of being synchronous.
 
     def run_fix_fingers(self, context, interval, shutdown_event):
         pair = context.socket(zmq.PAIR)
@@ -355,26 +356,32 @@ class Node:
         logging.info(f'Starting loop for node {self.digest_id}')
         logging.info(f'Node {self.digest_id} managing virtual nodes: {self.virtual_nodes.keys()}')
 
+        # Create PAIR socket for stabilize
         stability = self.context.socket(zmq.PAIR)
         stability.setsockopt(zmq.LINGER, 0)
         stability.bind(self.stabilize_address)
 
+        # Create PAIR socket for fix_fingers
         fix_fingers = self.context.socket(zmq.PAIR)
         fix_fingers.setsockopt(zmq.LINGER, 0)
         fix_fingers.bind(self.fix_fingers_address)
 
+        # Create Poller to listen for messages on all sockets
         poller = zmq.Poller()
         poller.register(self.receiver, zmq.POLLIN)
         poller.register(stability, zmq.POLLIN)
         poller.register(fix_fingers, zmq.POLLIN)
 
         shutdown_event = threading.Event()
+
+        # Start stabilize thread
         if stabilize_interval:
             stability_t = threading.Thread(target=self.run_stabilize,
                                            args=[self.context, stabilize_interval, shutdown_event],
                                            daemon=True)
             stability_t.start()
 
+        # Start fix fingers thread
         if fix_fingers_interval:
             fix_fingers_t = threading.Thread(target=self.run_fix_fingers,
                                              args=[self.context, fix_fingers_interval, shutdown_event],
@@ -389,11 +396,12 @@ class Node:
                 received_exit = self.process_input(socks, stability, fix_fingers)
                 if received_exit:
                     shutdown_event.set()
-                    # TODO notify successors and predecessors of known departure
                     break
 
             logging.info(f'Node {self.digest_id} shutting down...')
             logging.info(f'Node state: {[vars(v_node) for v_node in self.virtual_nodes.values()]}')
+
+        # TODO notify successors and predecessors of known departure
 
         finally:
             logging.debug(f'Node {self.digest_id} destroying context...')
@@ -463,8 +471,9 @@ class ChordNode(Node):
 
 
 # TODO extract common logic to command
-# TODO refactor if/else in execute to state pattern
+# TODO refactor if/else in execute() to state pattern
 # TODO optimize requests on the same host
+# TODO move commands to their own module
 class Command:
 
     def execute(self, node):
@@ -481,10 +490,17 @@ class ExitCommand(Command):
         pass
 
     def execute(self, node):
-        # TODO exit command can notify successor and predecessor that it is shutting down
+        # TODO raise error
+        # Unlike java, in python exceptions can be used as signals
+        # https://softwareengineering.stackexchange.com/a/351121/392415
         pass
 
     def __eq__(self, other):
+        # Idea was to use a singleton because exit has no particular state
+        # But that is impractical because exit will be initiated by a separate
+        # process and sharing memory for this use case is overkill
+        # This is the alternative but a better approach would be for execute()
+        # to raise an exception
         return type(other) == ExitCommand
 
 
@@ -534,9 +550,6 @@ class PredecessorCommand(Command):
 class FindSuccessorCommand(Command):
 
     # TODO handle get/put requests from clients
-    # set recipient to receiving node so it calls find_successor first
-    # set initiator parent digest and address to client id and address
-    #   do not set initiator digest
 
     def __init__(self, initiator=None, recipient=None, hops=0, found=False,
                  search_digest=None, return_data=None):
@@ -740,6 +753,7 @@ def main():
                                        fix_fingers_interval, node_type, hash_func, virtual_nodes)
 
         print(f'Node {node.name} joined network with {len(node.virtual_nodes)} virtual node(s)')
+        # TODO - exit with error code if no nodes were added to network
 
         while node_t.is_alive():
             if not quiet:

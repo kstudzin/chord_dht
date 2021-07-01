@@ -12,6 +12,7 @@ From the project root run the following commands:
    _(Note: This will need to be run every time you open a new shell. To avoid re-running, add the contents to your shell profile.)_ 
 2. `pip install -r requirements.txt`
 3. Set log level in `chord/util.py`. Logs are in `chord.log` from the directory the code was run from. _Node: DEBUG has a lot of logging_ 
+4. Install mininet
 
 ### Testing
 

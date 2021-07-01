@@ -1,12 +1,9 @@
 import argparse
 import logging
 import pprint
-import random
 import struct
-import sys
 import threading
 import time
-from random import randrange
 from urllib.parse import urlparse
 
 import zmq

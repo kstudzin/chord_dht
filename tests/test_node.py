@@ -1,13 +1,10 @@
-import logging
+import pytest
+
 from unittest import mock
 from unittest.mock import Mock, patch
 
-import pytest
-import zmq
-from pytest_mock import mocker
-
 from chord.hash import NUM_BITS
-from chord.node import Node, Command, FindSuccessorCommand, ChordNode, RoutingInfo, VirtualNode
+from chord.node import Node, ChordNode, RoutingInfo, VirtualNode
 
 
 @mock.patch('chord.node.zmq')

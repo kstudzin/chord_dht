@@ -2,7 +2,6 @@ import argparse
 import json
 import re
 import statistics
-import sys
 import sortedcontainers
 
 from collections import defaultdict
@@ -128,13 +127,17 @@ def main():
 
     # Parse log
     nodes_map, digests = parse_file(filename)
+    if not nodes_map and not digests:
+        print('No data found. Check that log level set to INFO.')
+        exit(1)
 
     # Calculate load for each node
     if load_statistics:
-        print(f'Evalutating {len(digests)} nodes')
-        load = calculate_loads(digests)
-        print(f'Average load: {statistics.mean(load.values())}')
-        print(f'Standard deviation: {statistics.stdev(load.values())}')
+        print(f'Evaluating {len(digests)} nodes')
+        if digests:
+            load = calculate_loads(digests)
+            print(f'Average load: {statistics.mean(load.values())}')
+            print(f'Standard deviation: {statistics.stdev(load.values())}')
 
     # Calculate errors
     if finger_errors:

@@ -10,21 +10,21 @@ successor(12) = N14
 
 N41
 
-#### 4. What is the set of keys that N21 is responsible for? Your answer should use interval nota(on e.g. [start, end) using brackets to denote that number is included in the set and parens to denote the number is not included in the set
+#### 4. What is the set of keys that N21 is responsible for? Your answer should use interval notation e.g. [start, end) using brackets to denote that number is included in the set and parens to denote the number is not included in the set
 
 (14, 21]
 
 #### 5. The successor(50) = 60. If we assume that node 50 is aware that node 60 is its current successor, is this enough information for node 50 to know the set of keys that node 60 is responsible for? Explain your answer in a sentence or two
 
-Yes. If 50 know 60 is its successor, then it also knows that it is 60 predecessor. A node is responsible for all the keys between itself and its predecessor.  50 knows this so that it knows what nodes it is responsible for, i.e. it knows that it is responsible for all keys after its successor up to 50. By the same logic, it knows that its successor is responsible for keys after 50 up to 60.
+Yes. If 50 know 60 is its successor, then it also knows that it is 60's predecessor. A node is responsible for all the keys between itself and its predecessor.  50 knows this so that it knows what nodes it is responsible for, i.e. it knows that it is responsible for all keys after its successor up to 50. By the same logic, it knows that its successor is responsible for keys after 50 up to 60.
 
-#### If every node in the ring has a pointer to its current successor (e.g. we are ignoring nodes joining and leaving), a simple routing algorithm is possible. To locate the node responsible for a given key K_search, each node determines if it’s successor is responsible for K_search. If yes, then return the successor’s node ID. Else, forward the query onwards to your successor who repeats the process. The pseudocode is shown below. Using this algorithm, how many network hops would it take for node 50 to locate the node responsible for key 12?
+#### 6. If every node in the ring has a pointer to its current successor (e.g. we are ignoring nodes joining and leaving), a simple routing algorithm is possible. To locate the node responsible for a given key K_search, each node determines if it’s successor is responsible for K_search. If yes, then return the successor’s node ID. Else, forward the query onwards to your successor who repeats the process. The pseudocode is shown below. Using this algorithm, how many network hops would it take for node 50 to locate the node responsible for key 12?
 
-It would take 4 hops for N50 to locate key 12. N50 -> N60 -> N4 -> N10 -> N14
+It would take 3 hops for N50 to locate key 12. N50 -> N60 -> N4 -> N10. N10 returns its successor N14 as the node responsible for key 12.
 
 #### 7. If every node stored the current (again, we are ignoring nodes joining or leaving), how many network hops would it take for node 4 to determine the node that is responsible for key 22?
 
-It would take 4 hops for N4 to locate key 22. N4 -> N10 -> N14 -> N21 -> N23
+It would take 4 hops for N4 to locate key 22. N4 -> N10 -> N14 -> N21. N21 returns N23 which is responsible for key 22
 
 #### 8. Each node N_source maintains a small table of “finger entries”. The table entry for finger[k] on a specific node lists the address of another node N_target. This ‘target’ is the node that is responsible for key N_source + 2^(k-1). In precise terms, this is `successor(N_source + 2^(k-1))`
 
@@ -105,7 +105,7 @@ _**Hint: Look at the definition of successor. Is it possible for a lower-valued 
 
 _**Clarification: We are ignoring modular arithmetic here....please don’t worry about the edge case**_
 
-Ignoring the modular arithmetic, it is not possible for that `successor(34) = N21` because 34 is greater than 21. 
+Ignoring the modular arithmetic, it is not possible that `successor(34) = N21` because 34 is greater than 21. 
 
 #### 15. If node 10 wants to find the node responsible for K34 e.g. successor(34), it will search its finger table. Would it be possible for node 50 to be the successor(34)?
 
@@ -138,7 +138,7 @@ If a node N knows that it is not responsible for a key K, then the key identifie
 |---|------------------|-----------|
 ```
 
-#### 19. The following is the chord routing algorithm. Not a question, but see if you can spot why the above questions were asked. Attempt to route from node 4, looking for key 12.
+#### 19. The following is the chord routing algorithm. Attempt to route from node 4, looking for key 12.
 
 ```
 n4.find_successor(12)

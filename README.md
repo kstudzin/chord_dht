@@ -33,6 +33,7 @@ Run tests using `pytest` from the project root or `tests` directories. All docum
 | Virtual Nodes | `chord/node.py` |
 | Cryptographic vs. Non-Cryptographic Hashes | `README.md` |
 | How Chord Relates to B-trees | `README.md` |
+| Content Addressable Networks | `README.md` |
 
 ### Chord Worksheet
 
@@ -445,7 +446,19 @@ When a node joins the network, contacts a node in the network to get a random lo
 
 In many ways CANs are a multi-dimensional version of chord. In both approaches nodes are responsible for a set of keys nearby in the address space. To join a network, a node talks to a known entry point node to get the address of the network node it will be close to in the overlay network. The new node lets its new neighbor know it has arrived, and the nearby node hands off some keys it is responsible for to the new node. When a node leaves the network, a nearby node takes over the keys the exiting node was responsible for. In both approaches, each node maintains a list of other nodes it can route queries to. In chord this list includes nodes that are closer on the overlay network and nodes that are further, while in CANs, this list only includes neighbors. Chord nodes do have references to their neighbors, their predecessor and successor, but they are not used for routing.
 
-Even with all of these similarities, there are some differences and usage considerations which choosing a DHT. One consideration is fault tolerance. In addition to routing, CAN nodes' list of neighbors provide fault tolerance. When a chord node's finger is unavailable, chord follows a chain of successors. While it still finds the data, performance is worse. Because CAN nodes have a list of neighbors and multiple neighbors can provide correct routes to the destination, a node can route a lookup through a different neighbor when one is down. Another consideration is scaling. In chord performance scales with the number of nodes in the network, while CAN networks scale with dimensionality. (Both more nodes in chord and higher dimensions in CAN lead to increased fault tolerance). Lastly, there are load balancing considerations. While chord load balancing is largely dependent on the distribution properties of the hash function, CANs are able to dynamically load balance because there are multiple neighbors who could become responsible for a given region.  One example of CAN rebalancing is that after a node leaves the network, neighbors vote so that the smallest region can maintain the newly abandoned region.
+Even with all of these similarities, there are some differences and usage considerations which choosing a DHT. One consideration is fault tolerance. In addition to routing, CAN nodes' list of neighbors provide fault tolerance. When a chord node's finger is unavailable, chord follows a chain of successors. While it still finds the data, performance is worse. Because CAN nodes have a list of neighbors and multiple neighbors can provide correct routes to the destination, a node can route a lookup through a different neighbor when one is down. Another consideration is scaling. In chord performance scales with the number of nodes in the network, while CAN networks scale with dimensionality. (Both more nodes in chord and higher dimensions in CAN lead to increased fault tolerance). Lastly, there are load balancing considerations. While chord load balancing is largely dependent on the distribution properties of the hash function, CANs are able to dynamically load balance because there are multiple neighbors who could become responsible for a given region.  One example of CANs rebalancing is that after a node leaves the network, neighbors vote so that the smallest region can maintain the newly abandoned region.
+
+## Jump Hashes
+
+Jump hash is a fast and efficient approach to consistent hashing optimized for distributing persistent data across servers, a process known as sharding. Because the cluster should be able to grow without redistributing existing data, consistent hashing is useful. However, it was not designed for this use case, and the original properties cause unnecessary overhead. By specifying that systems using the new jump hash can expect that servers will remain in the network, even if replaced by a replica, that clients will know about all shards, and that the servers can be numbered sequentially, the authors wrote an algorithm that significantly reduces memory usage.
+
+The two consistent hash properties maintained by jump hash are balance and monotonicity. Balance refers to the distribution of input into buckets. Monotonicity means that when a new server joins the cluster, keys will only move from an old server to a new server, never from an old server to another old server. Specifically adding a server to a cluster of `n` servers means that only `1 / (n + 1)` of the keys would move to the new server.
+
+Jump hash is an elegant and concise algorithm that is based on simple properties of real numbers and probability. The algorithm, called `jh`, takes an integer key and an integer number of buckets and then outputs a specific bucket that the key maps to. For example, we might have `jh(3, 5) = 2` which means that out of five possible buckets, key 3 maps to bucket 2. The fundamental property this algorithm uses is that a uniformly generated (pseudo) random number `x` between 0 and 1 will have a value `x < 1/n` with probability `1/n` where `n` is an integer greater than zero. To understand how this property applies, consider multiple calls with different bucket sizes.
+
+Suppose `p` keys have been assigned to `q` buckets, and then a new bucket is added. Now for any key and `q + 1` buckets, the first `q - 1` steps of the algorithm will be the same. However, each call will execute one more loop iteration for the new bucket. During this iteration, keys will be assigned to the new bucket if `x < 1 / (q + 1)` where `x` is a random number between 0 and 1. Because of the property mentioned above, this should happen for `1 / (q + 1)` keys. Additionally, the first `q - 1` iterations will be the same for the other `q / (q + 1)` keys, meaning they will be assigned to their old bucket. Therefore, we have moved exactly the right number of keys to maintain our balanced system, and all moved keys are placed in the new bucket.
+
+The algorithm discussed above scales linearly with the number of buckets. However, the authors achieve logarithmic scaling by deriving a closed formula to calculate the next jump. The key insight to predicting a jump is noticing that for every iteration `i`,`b_i = b_(i-1)` except if a jump has just been made. The goal of the logarithmic version is to only run iterations where `b_i != b_(i-1)`. The authors point out a formula for calculating the probability that two iterations have the same result using the property discussed above. Further, they note that at each step in the algorithm  for candidate bucket `b`, and iteration index `i`, `i >= b` if and only if `b` did not jump in the `i-th` iteration. The chart below steps through the algorithm to demonstrate this property. Now we have identified two indicators that a jump has occurred. At this point the closed formula for the next bucket is derived by setting the probabilities of our two indicators equal to each other and solving for `i`.
 
 ## Troubleshooting
 
@@ -461,18 +474,21 @@ Try running command locally and see what errors arise
 - [ ] Add `pytest-mock` to `requirements.txt`
 - [x] Testing specify id that acts like a hash to avoid collisions in small address space
 - [x] Accept port for router socket. Needs to be bound before dealer binds to random port
-- [ ] Main thread sends exit message to pair sockets. Pair polls - this is the only async message they receive. What happens if they get exit message when waiting for other message?
-- [ ] Investigate why some nodes hang on `context.destroy()`
-- [ ] Add generator for virtual node keys
+- [ ] ~~Main thread sends exit message to pair sockets. Pair polls - this is the only async message they receive. What happens if they get exit message when waiting for other message?~~ Used Event
+- [x] Investigate why some nodes hang on `context.destroy()`
+- [x] Add generator for virtual node keys
 - [x] Add virtual nodes to cli
 - [x] Add chord node type to cli
 
 #### Low Priority (Code Quality)
 
+- [ ] verify running chord with quiet works
+- [ ] `run_chord.py` check exit status of node. Pipe output to file.
 - [ ] Exit Command __eq__ explanation
-- [ ] Add execute to ExitCommand
-- [ ] Use timers rather than threads sleeping for stabilize and fix fingers
-- [ ] Add `run_chord.py` options to set stabilize and fix fingers intervals
+- [ ] Add execute to ExitCommand to notify neighbors? Is raising an exception and sending message in finally more Pythonic? 
+- [ ] ~~Use timers rather than threads sleeping for stabilize and fix fingers~~ Timers were difficult because calling the method recursively, not recreating the pair socket, and close pair socket only  once was challenging if not impossible. Used Events to stop the loop. Maybe could use exception to interrupt sleep?
+- [ ] Check if event is set before going to sleep in threads
+- [x] Add `run_chord.py` options to set stabilize and fix fingers intervals
 - [ ] `Command.execute()` could share more code between subclasses
 - [ ] Add optimization to `find_successor()` to see if current node is successor: if predecessor is set, check if the digest is between predecessor and current node
 - [ ] Search for node rather than iterate in `consistent_load_balancer`

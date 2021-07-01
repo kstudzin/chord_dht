@@ -5,7 +5,6 @@ This file contains the code for chord nodes before adding ZMQ.
 '''
 import argparse
 import json
-import pprint
 import statistics
 import logging
 import sys
@@ -13,8 +12,6 @@ import sys
 from sortedcontainers import SortedDict
 from hash import hash_value, NUM_BITS
 from util import generate_keys, open_closed, open_open
-
-pp = pprint.PrettyPrinter()
 
 
 class DirectNode:

@@ -501,7 +501,6 @@ Space for tracking improvements along with inline TODO comments
 #### High Priority
 
 - [ ] Implement data storage and client
-- [ ] Add `pytest-mock` to `requirements.txt`
 
 #### Low Priority
 

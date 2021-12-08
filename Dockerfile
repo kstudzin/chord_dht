@@ -1,6 +1,8 @@
 FROM ubuntu:latest
 
-RUN apt install python3 python3-pip \
+RUN add-apt-repository universe \
+    && apt-get update \
+    && apt install python3 python3-pip \
     && pip install pyzmq \
     && mkdir /opt/chord
 

@@ -1,6 +1,7 @@
 import argparse
 import logging
 import pprint
+import socket
 import struct
 import threading
 import time
@@ -676,7 +677,7 @@ def config_parser():
                              'join to join an existing network')
     parser.add_argument('name', type=str, help='Name of node to create. When --real-hashes is NOT specified, '
                                                'the name should be the digest.')
-    parser.add_argument('address', type=str, help='Address of node')
+    # parser.add_argument('address', type=str, help='Address of node')
 
     parser.add_argument('--known-endpoint', '-ke', type=str,
                         help='Endpoint of node in network. Required to join an existing network.')
@@ -720,7 +721,7 @@ def main():
 
     action = args.action
     name = args.name
-    address = args.address
+    address = socket.gethostbyname(name)
 
     known_endpoint = args.known_endpoint
     known_name = args.known_name

@@ -5,6 +5,6 @@ RUN apt-get update \
     && pip install pyzmq \
     && mkdir /opt/chord
 
-COPY chord/nody.py /opt/chord/
+COPY chord/node.py /opt/chord/
 COPY chord/util.py /opt/chord/
 COPY chord/hash.py /opt/chord/

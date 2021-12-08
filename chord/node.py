@@ -4,6 +4,7 @@ import pprint
 import struct
 import threading
 import time
+import random
 from urllib.parse import urlparse
 
 import zmq
@@ -60,11 +61,6 @@ class VirtualNode:
 
     def find_next_node(self, digest):
         return self.successor
-
-    # TODO - precompute these indexes
-    def next_finger_key(self):
-        for i in range(NUM_BITS):
-            yield (self.get_digest() + pow(2, i)) % (pow(2, NUM_BITS) - 1)
 
     def notify(self, other):
         logging.debug(f'Node {self.routing_info.digest} notified by node {other.digest}')
@@ -326,9 +322,10 @@ class Node:
         for v_node in self.virtual_nodes.values():
             logging.debug(f"Building finger table for {v_node.name} (Digest: {v_node.get_digest()})")
 
-            for i, next_key in enumerate(v_node.next_finger_key()):
-                self._find_successor(pair, next_key, v_node.routing_info, i)
-                logging.debug(f"  Found finger {i} is successor({next_key}) = {v_node.fingers[i]}")
+            random_index = random.randint(0, NUM_BITS - 1)
+            next_key = (v_node.get_digest() + pow(2, random_index)) % (pow(2, NUM_BITS) - random_index)
+            self._find_successor(pair, next_key, v_node.routing_info, random_index)
+            logging.debug(f"  Found finger {random_index} is successor({next_key}) = {v_node.fingers[random_index]}")
 
     @staticmethod
     def _find_successor(pair, digest, initiator, index):

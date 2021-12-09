@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 
 import zmq
 
-from util import open_closed, open_open
+from util import open_closed, open_open, request
 from hash import NUM_BITS, hash_value
 
 # -----------------------------------------------------------------------------
@@ -429,6 +429,9 @@ class Node:
             command = sock.recv_pyobj()
             logging.debug(f'Node {self.digest_id} received command {command}')
 
+            if isinstance(command, FindSuccessorCommand) and command.initiator.digest == 256:
+                request.debug(f'Node {self.digest_id} received command {command}')
+
             if command == EXIT_COMMAND:
                 logging.debug(f'Node {self.digest_id} received EXIT message. Node shutting down.')
                 return True
@@ -718,7 +721,6 @@ def config_parser():
 
 
 def main():
-
     parser = config_parser()
     args = parser.parse_args()
 

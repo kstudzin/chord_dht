@@ -128,7 +128,7 @@ class RoutingInfo:
 class Node:
 
     def __init__(self, node_name, node_id, address, external_port=None, internal_port=None, virtual={}):
-        endpoint_fmt = '{0}:{1}'
+        endpoint_fmt = 'tcp://{0}:{1}'
 
         # Node identification
         self.name = node_name

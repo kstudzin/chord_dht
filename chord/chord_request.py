@@ -35,7 +35,7 @@ def main():
     parser = config_parser()
     args = parser.parse_args()
 
-    bootstrap_id = struct.pack('i', 1)
+    bootstrap_id = 1
     endpoint = f'tcp://{socket.gethostbyname(socket.gethostname())}:{args.port}'
 
 
@@ -63,7 +63,7 @@ def main():
     print(f'Chord Node: {args.bootstrap_endpoint} ({bootstrap_id})')
     print(f'Command: {cmd}')
     start = time.time()
-    router.send(bootstrap_id, zmq.SNDMORE)
+    router.send(struct.pack('i', bootstrap_id), zmq.SNDMORE)
     router.send_pyobj(cmd)
 
     # Wait for response

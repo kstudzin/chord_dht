@@ -715,7 +715,6 @@ def config_parser():
 
 
 def main():
-    pp = pprint.PrettyPrinter()
 
     parser = config_parser()
     args = parser.parse_args()
@@ -723,6 +722,9 @@ def main():
     action = args.action
     name = args.name
     address = socket.gethostbyname(socket.gethostname())
+
+    output = open(f'/opt/chord/out{name}.log', 'w')
+    output.write(f'Starting chord node {name} at {address}')
 
     known_endpoint = args.known_endpoint
     known_name = args.known_name
@@ -753,14 +755,16 @@ def main():
 
         while node_t.is_alive():
             if not quiet:
-                pp.pprint(finger_table_links(node))
+                output.write(finger_table_links(node))
             node_t.join(30)
 
     elif action == 'shutdown':
 
-        print('Shutting down...')
+        output.write('Shutting down...')
         handle_shutdown(name, address, internal_port, hash_func)
-        print(f'Shutdown node {name}')
+        output.write(f'Shutdown node {name}')
+
+    output.close()
 
 
 if __name__ == '__main__':

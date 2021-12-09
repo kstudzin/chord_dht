@@ -3,15 +3,15 @@
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: chord
+  name: chord-bootstrap
 spec:
   selector:
     matchLabels:
-        app: chord
+        app: chord-bootstrap
   template:
     metadata:
       labels:
-        app: chord
+        app: chord-bootstrap
     spec:
       containers:
       - name: chord

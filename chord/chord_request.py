@@ -55,8 +55,8 @@ def main():
 
     # Find successor command
     print('Creating find successor command')
-    me = RoutingInfo(address=endpoint, digest=args.id)
-    cn = RoutingInfo(address=args.bootstrap_endpoint, digest=bootstrap_id)
+    me = RoutingInfo(address=endpoint, digest=args.id, parent_digest=args.id)
+    cn = RoutingInfo(address=args.bootstrap_endpoint, digest=bootstrap_id, parent_digest=bootstrap_id)
     cmd = FindSuccessorCommand(initiator=me, recipient=cn, search_digest=args.search_term)
 
     # Send message

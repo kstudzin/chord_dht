@@ -356,22 +356,27 @@ class Node:
         stability = self.context.socket(zmq.PAIR)
         stability.setsockopt(zmq.LINGER, 0)
         stability.bind(self.stabilize_address)
+        logging.debug(f'Stabilize using address {self.stabilize_address}')
 
         # Create PAIR socket for fix_fingers
         fix_fingers = self.context.socket(zmq.PAIR)
         fix_fingers.setsockopt(zmq.LINGER, 0)
         fix_fingers.bind(self.fix_fingers_address)
+        logging.debug(f'Fix fingers using address {self.fix_fingers_address}')
 
         # Create Poller to listen for messages on all sockets
         poller = zmq.Poller()
         poller.register(self.receiver, zmq.POLLIN)
         poller.register(stability, zmq.POLLIN)
         poller.register(fix_fingers, zmq.POLLIN)
+        logging.debug('Poller listening to receiver, stability, and fix_fingers')
 
         shutdown_event = threading.Event()
+        logging.debug('Created shutdown event')
 
         # Start stabilize thread
         if stabilize_interval:
+            logging.debug('Starting stabilize thread...')
             stability_t = threading.Thread(target=self.run_stabilize,
                                            args=[self.context, stabilize_interval, shutdown_event],
                                            daemon=True)
@@ -379,6 +384,7 @@ class Node:
 
         # Start fix fingers thread
         if fix_fingers_interval:
+            logging.debug('Starting fix fingers thread...')
             fix_fingers_t = threading.Thread(target=self.run_fix_fingers,
                                              args=[self.context, fix_fingers_interval, shutdown_event],
                                              daemon=True)

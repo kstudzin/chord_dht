@@ -1,6 +1,6 @@
 import logging
 
-logging.basicConfig(filename='chord.log', level=logging.INFO,
+logging.basicConfig(filename='chord.log', level=logging.DEBUG,
                     format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s')
 
 

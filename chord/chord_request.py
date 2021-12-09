@@ -40,28 +40,37 @@ def main():
 
 
     # Start dealer waiting
+    print('Creating ZMQ Context')
     context = zmq.Context()
-    with ThreadPoolExecutor() as executor:
-        future = executor.submit(wait_for_response, context=context, id=args.id, endpoint=endpoint)
+
+    print('Creating thread pool executor')
+    executor = ThreadPoolExecutor()
+    future = executor.submit(wait_for_response, context=context, id=args.id, endpoint=endpoint)
 
     # ZMQ sockets
+    print('Creating router socket')
     router = context.socket(zmq.ROUTER)
     router.setsockopt(zmq.LINGER, 0)
     router.connect(args.bootstrap_endpoint)
 
     # Find successor command
+    print('Creating find successor command')
     me = RoutingInfo(address=endpoint, digest=args.id)
     cn = RoutingInfo(address=args.bootstrap_endpoint, digest=bootstrap_id)
     cmd = FindSuccessorCommand(initiator=me, recipient=cn, search_digest=args.search_term)
 
     # Send message
+    print(f'Chord Node: {args.bootstrap_endpoint} ({bootstrap_id})')
+    print(f'Command: {cmd}')
     start = time.time()
     router.send(bootstrap_id, zmq.SNDMORE)
     router.send_pyobj(cmd)
 
     # Wait for response
+    print('Waiting on future')
     result = future.result()
     end = time.time()
+    executor.shutdown()
 
     print(f'{result.digest},{result.address},{end - start}')
 

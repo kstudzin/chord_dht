@@ -567,11 +567,8 @@ class FindSuccessorCommand(Command):
     def execute(self, node):
         logging.debug(f'Node {node.digest_id} executing command: {vars(self)}')
 
-        if self.found:
-            if not self.initiator.digest:
-                return self.client_response()
-            elif self.initiator.digest in node.virtual_nodes:
-                return self.update_node(node)
+        if self.found and self.initiator.digest in node.virtual_nodes:
+            return self.update_node(node)
         elif self.recipient.digest in node.virtual_nodes:
             v_node = node.virtual_nodes[self.recipient.digest]
             self.found, self.recipient, self.hops = v_node.find_successor(self.search_digest, self.hops)
@@ -598,7 +595,7 @@ class FindSuccessorCommand(Command):
         return RoutingInfo(address=node.fix_fingers_address)
 
     def forward_result(self):
-        if self.found and self.initiator.digest:
+        if self.found:
             # If successor is found and the initiator has a digest set, the result
             # is sent to another node in the network
             return self.initiator

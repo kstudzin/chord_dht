@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import zmq
 
-from chord.node import RoutingInfo, FindSuccessorCommand
+from node import RoutingInfo, FindSuccessorCommand
 
 
 def wait_for_response(context, id, endpoint):
@@ -25,8 +25,8 @@ def config_parser():
 
     parser.add_argument('search_term')
     parser.add_argument('bootstrap_endpoint')
-    parser.add_argument('id', default=256)
-    parser.add_argument('port', default='5550')
+    parser.add_argument('--id', default=256)
+    parser.add_argument('--port', default='5550')
 
     return parser
 

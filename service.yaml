@@ -8,13 +8,13 @@ spec:
   selector:
     app: chord-bootstrap
   ports:
-    - name: chord-port
+    - name: chord-external
       protocol: TCP
       port: 5556
       targetPort: 5556
       nodePort: 30056
     # TODO: Below could be its own ClusterIP service
-    - name: chord-port
+    - name: chord-internal
       protocol: TCP
       port: 5555
       targetPort: 5555

@@ -139,6 +139,7 @@ class Node:
         self.router = self.context.socket(zmq.ROUTER)
         self.router.setsockopt(zmq.LINGER, 0)
 
+        print(f'External endpoint: {address}:{external_port}')
         if external_port:
             self.external_endpoint = endpoint_fmt.format(address, external_port)
             self.router.bind(self.external_endpoint)
@@ -721,7 +722,7 @@ def main():
 
     action = args.action
     name = args.name
-    address = socket.gethostbyname(name)
+    address = socket.gethostbyname(socket.gethostname())
 
     known_endpoint = args.known_endpoint
     known_name = args.known_name

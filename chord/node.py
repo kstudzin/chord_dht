@@ -755,7 +755,7 @@ def main():
 
         while node_t.is_alive():
             if not quiet:
-                output.writelines(finger_table_links(node))
+                print(finger_table_links(node), output)
             node_t.join(30)
 
     elif action == 'shutdown':

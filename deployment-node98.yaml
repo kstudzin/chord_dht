@@ -3,7 +3,7 @@
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: chord
+  name: chord98
 spec:
   selector:
     matchLabels:
@@ -22,7 +22,7 @@ spec:
         - containerPort: 5556
         command: ["python3"]
         args: ["/opt/chord/node.py",
-               "join", "100",
+               "join", "98",
                "--internal-port", "5555",
                "--external-port","5556",
                "--known-endpoint", "tcp://10.244.1.80:5555",

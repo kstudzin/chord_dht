@@ -45,14 +45,16 @@ def open_closed(start, end, test, logging_on):
         result = start < test <= end
         if logging_on:
             request.debug(f'In if, returning {result}')
-        return result
     else:
         if logging_on:
             request.debug('HERE 2')
         result = (test > start or test <= end)
         if logging_on:
             request.debug(f'In else, returning {result}')
-        return result
+
+    if logging_on:
+        request.debug(f'Returning from open_closed: {result}')
+    return result
 
 
 def open_open(start, end, test):

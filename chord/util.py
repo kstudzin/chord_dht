@@ -19,7 +19,7 @@ def setup_logger(name, log_file, level=logging.INFO):
     return logger
 
 
-request = setup_logger('requests', 'chord_request.py', level=logging.DEBUG)
+request = setup_logger('requests', 'chord_request.log', level=logging.DEBUG)
 logging = setup_logger('chord', 'chord.log')
 
 

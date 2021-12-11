@@ -583,7 +583,11 @@ class FindSuccessorCommand(Command):
             if self.initiator.digest != 1:
                 request.debug('Searching for term')
             v_node = node.virtual_nodes[self.recipient.digest]
+            if self.initiator.digest != 1:
+                request.debug(f'Found v_node: {v_node}')
             self.found, self.recipient, self.hops = v_node.find_successor(self.search_digest, self.hops)
+            if self.initiator.digest != 1:
+                request.debug(f'Left find_successor: {self.found}, {self.recipient}, {self.hops}')
             return self.forward_result()
         else:
             logging.error(f'Node {node.digest_id} unable to execute {self}')

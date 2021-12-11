@@ -1,0 +1,31 @@
+---
+
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: chord118
+spec:
+  selector:
+    matchLabels:
+        app: chord
+  template:
+    metadata:
+      labels:
+        app: chord
+    spec:
+      containers:
+      - name: chord
+        image: chord:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 5555
+        - containerPort: 5556
+        command: ["python3"]
+        args: ["/opt/chord/node.py",
+               "join", "118",
+               "--internal-port", "5555",
+               "--external-port","5556",
+               "--known-endpoint", "tcp://10.244.1.80:5555",
+               "--known-name", "1"
+        ]
+...

@@ -27,4 +27,5 @@ while True:
     print(f'Waiting {sleep_time} seconds')
     time.sleep(sleep_time)
 
-
+    # Get list of new pods
+    pods = v1.list_pod_for_all_namespaces(label_selector='app=chord').items

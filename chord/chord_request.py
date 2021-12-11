@@ -10,7 +10,7 @@ from node import RoutingInfo, FindSuccessorCommand
 
 
 def wait_for_response(context, id, endpoint):
-    identity = struct.pack('i', id)
+    identity = struct.pack('i', int(id))
 
     receiver = context.socket(zmq.DEALER)
     receiver.setsockopt(zmq.LINGER, 0)

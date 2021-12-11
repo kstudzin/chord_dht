@@ -167,6 +167,8 @@ class Node:
 
         self.virtual_nodes = self.create_virtual_nodes(virtual)
 
+        request.debug(f'Node created: [name: {self.name}, id: {self.digest_id}, external address: {self.external_endpoint}, internal  address: {self.internal_endpoint}]')
+
     def create_virtual_nodes(self, virtual):
         virtual_node_type = self.get_virtual_node_type()
 

@@ -50,8 +50,8 @@ def main():
     # ZMQ sockets
     print('Creating router socket')
     router = context.socket(zmq.ROUTER)
-    router.setsockopt(zmq.LINGER, 0)
     router.connect(args.bootstrap_endpoint)
+    time.sleep(5)
 
     # Find successor command
     print('Creating find successor command')

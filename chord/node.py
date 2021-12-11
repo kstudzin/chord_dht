@@ -41,15 +41,19 @@ class VirtualNode:
     def get_address(self):
         return self.routing_info.get_address()
 
-    def find_successor(self, digest, hops):
+    def find_successor(self, digest, hops, logging_on):
         if digest == self.routing_info.digest:
             return True, self.routing_info, hops
 
         logging.debug(f"    Is id {digest} contained in ({self.get_digest()}, {self.successor.get_digest()}]?")
+        if logging_on:
+            request.debug(f"    Is id {digest} contained in ({self.get_digest()}, {self.successor.get_digest()}]?")
         if open_closed(self.get_digest(), self.successor.get_digest(), digest):
 
             # We have found the successor and will return it to the requester
             logging.debug(f"      Yes, returning successor {self.successor.get_digest()} hops: {hops}")
+            if logging_on:
+                request.debug(f"      Yes, returning successor {self.successor.get_digest()} hops: {hops}")
             return True, self.successor, hops + 1
         else:
 
@@ -57,10 +61,12 @@ class VirtualNode:
             # to advance to. For the naive nodes, this is also the successor. For
             # chord nodes, this is either a node from the finger table or the successor
             logging.debug(f"      No, finding closest preceding node")
-            next_node = self.find_next_node(digest)
+            if logging_on:
+                request.debug(f"      No, finding closest preceding node")
+            next_node = self.find_next_node(digest, logging_on)
             return False, next_node, hops + 1
 
-    def find_next_node(self, digest):
+    def find_next_node(self, digest, logging_on):
         return self.successor
 
     def notify(self, other):
@@ -78,21 +84,27 @@ class VirtualNode:
 
 class ChordVirtualNode(VirtualNode):
 
-    def find_next_node(self, digest):
-        return self.closest_preceding_node(digest)
+    def find_next_node(self, digest, logging_on):
+        return self.closest_preceding_node(digest, logging_on)
 
-    def closest_preceding_node(self, digest):
+    def closest_preceding_node(self, digest, logging_on):
 
         for finger in reversed(self.fingers):
             if not finger:
                 continue
 
             logging.debug(f"      Is {finger.digest} in ({self.routing_info.digest, digest})?")
+            if logging_on:
+                request.debug(f"      Is {finger.digest} in ({self.routing_info.digest, digest})?")
             if open_open(self.routing_info.digest, digest, finger.digest):
                 logging.debug(f"        Yes, returning finger {finger.digest}")
+                if logging_on:
+                    request.debug(f"        Yes, returning finger {finger.digest}")
                 return finger
 
         logging.debug(f"      Finger not found. Returning successor {self.successor.digest}")
+        if logging_on:
+            request.debug(f"      Finger not found. Returning successor {self.successor.digest}")
         return self.successor
 
 
@@ -568,12 +580,14 @@ class FindSuccessorCommand(Command):
 
         self.search_digest = search_digest
         self.return_data = return_data
+        self.logging_on = False
 
     def execute(self, node):
         logging.debug(f'Node {node.digest_id} executing command: {vars(self)}')
 
         if self.initiator.digest != 1:
             request.debug(f'Current state: {self}')
+            self.logging_on = True
 
         if self.found and self.initiator.digest in node.virtual_nodes:
             if self.initiator.digest != 1:
@@ -585,7 +599,7 @@ class FindSuccessorCommand(Command):
             v_node = node.virtual_nodes[self.recipient.digest]
             if self.initiator.digest != 1:
                 request.debug(f'Found v_node: {v_node}')
-            self.found, self.recipient, self.hops = v_node.find_successor(self.search_digest, self.hops)
+            self.found, self.recipient, self.hops = v_node.find_successor(self.search_digest, self.hops, self.logging_on)
             if self.initiator.digest != 1:
                 request.debug(f'Left find_successor: {self.found}, {self.recipient}, {self.hops}')
             return self.forward_result()

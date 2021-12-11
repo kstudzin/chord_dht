@@ -7,7 +7,8 @@ from datetime import datetime
 import kubernetes
 
 timestring = sys.argv[1]
-seconds = pt = datetime.strptime(timestring, '%M:%S,%f')
+ts = pt = datetime.strptime(timestring, '%M:%S,%f')
+seconds = ts.second + ts.minute*60
 print(f'Stopping a pod after an average of {seconds} seconds')
 
 kubernetes.config.load_kube_config()

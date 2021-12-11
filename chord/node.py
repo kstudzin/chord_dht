@@ -421,7 +421,8 @@ class Node:
         # TODO notify successors and predecessors of known departure
 
         except:
-            request.debug(f'Caught something: {sys.exc_info()}')
+            e = sys.exc_info()
+            request.debug(f'Caught something: {e[0]}, {e[1]}, {str(e[2])}')
         finally:
             logging.debug(f'Node {self.digest_id} destroying context...')
             request.debug(f'Node {self.digest_id} destroying context...')

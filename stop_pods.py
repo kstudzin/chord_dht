@@ -1,4 +1,3 @@
-import datetime
 import random
 import sys
 import time
@@ -6,7 +5,8 @@ import time
 import kubernetes
 
 timestring = sys.argv[1]
-seconds = pt = datetime.strptime(timestring, '%M:%S,%f')
+seconds = pt = time.strptime(timestring, '%M:%S,%f')
+print(f'Stopping a pod after an average of {seconds} seconds')
 
 kubernetes.config.load_kube_config()
 

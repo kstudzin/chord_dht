@@ -421,6 +421,7 @@ class Node:
 
         finally:
             logging.debug(f'Node {self.digest_id} destroying context...')
+            request.debug(f'Node {self.digest_id} destroying context...')
 
             fix_fingers_t.join()
             stability_t.join()

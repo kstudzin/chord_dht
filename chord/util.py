@@ -38,12 +38,17 @@ def generate_keys(num_keys, key_prefix="cached_data"):
 def open_closed(start, end, test, logging_on):
     if logging_on:
         request.debug('In open_closed')
+
     if start < end:
+        if logging_on:
+            request.debug('HERE 1')
         result = start < test <= end
         if logging_on:
             request.debug(f'In if, returning {result}')
         return result
     else:
+        if logging_on:
+            request.debug('HERE 2')
         result = test > start or test <= end
         if logging_on:
             request.debug(f'In else, returning {result}')

@@ -3,6 +3,7 @@ import logging
 import pprint
 import socket
 import struct
+import sys
 import threading
 import time
 import random
@@ -419,6 +420,8 @@ class Node:
 
         # TODO notify successors and predecessors of known departure
 
+        except:
+            request.debug(f'Caught something: {sys.exc_info()}')
         finally:
             logging.debug(f'Node {self.digest_id} destroying context...')
             request.debug(f'Node {self.digest_id} destroying context...')

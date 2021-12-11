@@ -431,7 +431,7 @@ class Node:
             command = sock.recv_pyobj()
             logging.debug(f'Node {self.digest_id} received command {command}')
 
-            if isinstance(command, FindSuccessorCommand) and command.recipient.digest != 1:
+            if isinstance(command, FindSuccessorCommand) and command.initiator.digest != 1:
                 request.debug(f'Node {self.digest_id} received command {command}')
 
             if command == EXIT_COMMAND:
@@ -572,15 +572,15 @@ class FindSuccessorCommand(Command):
     def execute(self, node):
         logging.debug(f'Node {node.digest_id} executing command: {vars(self)}')
 
-        if self.recipient.digest != 1:
+        if self.initiator.digest != 1:
             request.debug(f'Current state: {self}')
 
         if self.found and self.initiator.digest in node.virtual_nodes:
-            if self.recipient.digest != 1:
+            if self.initiator.digest != 1:
                 request.debug(f'Found the search term')
             return self.update_node(node)
         elif self.recipient.digest in node.virtual_nodes:
-            if self.recipient.digest != 1:
+            if self.initiator.digest != 1:
                 request.debug('Searching for term')
             v_node = node.virtual_nodes[self.recipient.digest]
             self.found, self.recipient, self.hops = v_node.find_successor(self.search_digest, self.hops)

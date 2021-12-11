@@ -1,11 +1,26 @@
+import datetime
+import random
+import sys
+import time
+
 import kubernetes
+
+timestring = sys.argv[1]
+seconds = pt = datetime.strptime(timestring, '%M:%S,%f')
 
 kubernetes.config.load_kube_config()
 
 v1 = kubernetes.client.CoreV1Api()
 pods = v1.list_pod_for_all_namespaces(label_selector='app=chord')
-for i in pods.items:
-    print("%s\t%s\t%s" % (i.status.pod_ip, i.metadata.namespace, i.metadata.name))
 
-deleted = v1.delete_namespaced_pod('spark-driver-deploy-58bbbfcb-9spnr', 'default')
-print(f'{deleted}')
+pod_ids = pods.keys()
+while True:
+    pod_idx = random.randrange(len(pod_ids))
+    pod_key = pod_ids[pod_idx]
+    pod = pods[pod_key]
+    deleted = v1.delete_namespaced_pod(pod.metadata.name, 'chord')
+    print(f'Deleted pod {pod.metadata.name}')
+    sleep_time = random.gauss(seconds, 3)
+    time.sleep(sleep_time)
+
+

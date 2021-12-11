@@ -23,6 +23,8 @@ while True:
     print(f'Deleted pod {pod.metadata.name}')
 
     sleep_time = random.gauss(seconds, 3)
+
+    print(f'Waiting {sleep_time} seconds')
     time.sleep(sleep_time)
 
 

@@ -8,15 +8,10 @@ import zmq
 
 from node import RoutingInfo, FindSuccessorCommand
 
+num_trials = 100
 
-def wait_for_response(context, id, endpoint):
-    identity = struct.pack('i', int(id))
 
-    receiver = context.socket(zmq.DEALER)
-    receiver.setsockopt(zmq.LINGER, 0)
-    receiver.setsockopt(zmq.IDENTITY, identity)
-    receiver.bind(endpoint)
-
+def wait_for_response(receiver):
     return receiver.recv_pyobj().recipient
 
 
@@ -48,20 +43,30 @@ def main():
     print('Creating ZMQ Context')
     context = zmq.Context()
 
-    print('Creating thread pool executor')
-    executor = ThreadPoolExecutor()
-    future = executor.submit(wait_for_response, context=context, id=id, endpoint=endpoint)
+    identity = struct.pack('i', id)
+    receiver = context.socket(zmq.DEALER)
+    receiver.setsockopt(zmq.LINGER, 0)
+    receiver.setsockopt(zmq.IDENTITY, identity)
+    receiver.bind(endpoint)
 
     # ZMQ sockets
     print('Creating router socket')
     router = context.socket(zmq.ROUTER)
     router.connect(bootstrap_endpoint)
-    time.sleep(5)
+    time.sleep(1)
+
+    print('Creating thread pool executor')
+    executor = ThreadPoolExecutor()
 
     # Find successor command
-    print('Creating find successor command')
     me = RoutingInfo(address=endpoint, digest=id, parent_digest=id)
     cn = RoutingInfo(address=bootstrap_endpoint, digest=bootstrap_id, parent_digest=bootstrap_id)
+
+    # for i in range(num_trials):
+    future = executor.submit(wait_for_response, receiver=receiver)
+    time.sleep(1)
+
+    print('Creating find successor command')
     cmd = FindSuccessorCommand(initiator=me, recipient=cn, search_digest=search_term)
 
     # Send message

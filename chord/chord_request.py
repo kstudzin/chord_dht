@@ -57,7 +57,7 @@ def main():
     print('Creating find successor command')
     me = RoutingInfo(address=endpoint, digest=args.id, parent_digest=args.id)
     cn = RoutingInfo(address=args.bootstrap_endpoint, digest=bootstrap_id, parent_digest=bootstrap_id)
-    cmd = FindSuccessorCommand(initiator=me, recipient=cn, search_digest=args.search_term)
+    cmd = FindSuccessorCommand(initiator=me, recipient=cn, search_digest=int(args.search_term))
 
     # Send message
     print(f'Chord Node: {args.bootstrap_endpoint} ({bootstrap_id})')

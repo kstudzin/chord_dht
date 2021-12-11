@@ -431,8 +431,7 @@ class Node:
             command = sock.recv_pyobj()
             logging.debug(f'Node {self.digest_id} received command {command}')
 
-            if isinstance(command, FindSuccessorCommand) and command.initiator.digest == 256:
-                request.debug(f'Node {self.digest_id} received command {command}')
+            request.debug(f'Node {self.digest_id} received command {command}')
 
             if command == EXIT_COMMAND:
                 logging.debug(f'Node {self.digest_id} received EXIT message. Node shutting down.')

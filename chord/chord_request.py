@@ -35,8 +35,13 @@ def main():
     parser = config_parser()
     args = parser.parse_args()
 
+    search_term = int(args.search_term)
+    bootstrap_endpoint = args.bootstrap_endpoint
+    id = int(args.id)
+    port = args.port
+
     bootstrap_id = 1
-    endpoint = f'tcp://{socket.gethostbyname(socket.gethostname())}:{args.port}'
+    endpoint = f'tcp://{socket.gethostbyname(socket.gethostname())}:{port}'
 
 
     # Start dealer waiting
@@ -45,22 +50,22 @@ def main():
 
     print('Creating thread pool executor')
     executor = ThreadPoolExecutor()
-    future = executor.submit(wait_for_response, context=context, id=args.id, endpoint=endpoint)
+    future = executor.submit(wait_for_response, context=context, id=id, endpoint=endpoint)
 
     # ZMQ sockets
     print('Creating router socket')
     router = context.socket(zmq.ROUTER)
-    router.connect(args.bootstrap_endpoint)
+    router.connect(bootstrap_endpoint)
     time.sleep(5)
 
     # Find successor command
     print('Creating find successor command')
-    me = RoutingInfo(address=endpoint, digest=args.id, parent_digest=args.id)
-    cn = RoutingInfo(address=args.bootstrap_endpoint, digest=bootstrap_id, parent_digest=bootstrap_id)
-    cmd = FindSuccessorCommand(initiator=me, recipient=cn, search_digest=int(args.search_term))
+    me = RoutingInfo(address=endpoint, digest=id, parent_digest=id)
+    cn = RoutingInfo(address=bootstrap_endpoint, digest=bootstrap_id, parent_digest=bootstrap_id)
+    cmd = FindSuccessorCommand(initiator=me, recipient=cn, search_digest=search_term)
 
     # Send message
-    print(f'Chord Node: {args.bootstrap_endpoint} ({bootstrap_id})')
+    print(f'Chord Node: {bootstrap_endpoint} ({bootstrap_id})')
     print(f'Command: {cmd}')
     start = time.time()
     router.send(struct.pack('i', bootstrap_id), zmq.SNDMORE)

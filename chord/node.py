@@ -48,7 +48,7 @@ class VirtualNode:
         logging.debug(f"    Is id {digest} contained in ({self.get_digest()}, {self.successor.get_digest()}]?")
         if logging_on:
             request.debug(f"    Is id {digest} contained in ({self.get_digest()}, {self.successor.get_digest()}]?")
-        if open_closed(self.get_digest(), self.successor.get_digest(), digest):
+        if open_closed(self.get_digest(), self.successor.get_digest(), digest, logging_on):
 
             # We have found the successor and will return it to the requester
             logging.debug(f"      Yes, returning successor {self.successor.get_digest()} hops: {hops}")

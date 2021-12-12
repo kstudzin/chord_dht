@@ -25,7 +25,7 @@ spec:
                "join", "62",
                "--internal-port", "5555",
                "--external-port","5556",
-               "--known-endpoint", "tcp://10.244.1.80:5555",
+               "--known-endpoint", "tcp://10.99.61.226:5555",
                "--known-name", "1"
         ]
 ...

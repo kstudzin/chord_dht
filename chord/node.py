@@ -422,7 +422,7 @@ class Node:
 
         except:
             e = sys.exc_info()
-            request.debug(f'Caught something: {e[0]}, {e[1]}, {str(e[2])}')
+            default_log.debug(f'Caught something: {e[0]}, {e[1]}, {str(e[2])}')
         finally:
             default_log.debug(f'Node {self.digest_id} destroying context...')
             request.debug(f'Node {self.digest_id} destroying context...')

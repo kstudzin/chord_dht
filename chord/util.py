@@ -19,8 +19,8 @@ def setup_logger(name, log_file, level=logging.INFO):
     return logger
 
 
-request = setup_logger('requests', 'chord_request.log', level=logging.DEBUG)
-logging = setup_logger('chord', 'chord.log')
+request = setup_logger('requests', 'request.log', level=logging.INFO)
+logging = setup_logger('chord', 'chord.log', level=logging.DEBUG)
 
 
 def generate_keys(num_keys, key_prefix="cached_data"):

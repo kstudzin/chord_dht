@@ -20,7 +20,7 @@ def setup_logger(name, log_file, level=logging.INFO):
 
 
 request = setup_logger('requests', 'request.log', level=logging.INFO)
-logging = setup_logger('chord', 'chord.log', level=logging.DEBUG)
+default_log = setup_logger('chord', 'chord.log', level=logging.DEBUG)
 
 
 def generate_keys(num_keys, key_prefix="cached_data"):

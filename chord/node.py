@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 
 import zmq
 
-from util import open_closed, open_open, request
+from util import open_closed, open_open, request, default_log
 from hash import NUM_BITS, hash_value
 
 # -----------------------------------------------------------------------------
@@ -46,13 +46,13 @@ class VirtualNode:
         if digest == self.routing_info.digest:
             return True, self.routing_info, hops
 
-        logging.debug(f"    Is id {digest} contained in ({self.get_digest()}, {self.successor.get_digest()}]?")
+        default_log.debug(f"    Is id {digest} contained in ({self.get_digest()}, {self.successor.get_digest()}]?")
         if logging_on:
             request.debug(f"    Is id {digest} contained in ({self.get_digest()}, {self.successor.get_digest()}]?")
         if open_closed(self.get_digest(), self.successor.get_digest(), digest, logging_on):
 
             # We have found the successor and will return it to the requester
-            logging.debug(f"      Yes, returning successor {self.successor.get_digest()} hops: {hops}")
+            default_log.debug(f"      Yes, returning successor {self.successor.get_digest()} hops: {hops}")
             if logging_on:
                 request.debug(f"      Yes, returning successor {self.successor.get_digest()} hops: {hops}")
             return True, self.successor, hops + 1
@@ -61,7 +61,7 @@ class VirtualNode:
             # We have not found the successor of the digest. Return the next node
             # to advance to. For the naive nodes, this is also the successor. For
             # chord nodes, this is either a node from the finger table or the successor
-            logging.debug(f"      No, finding closest preceding node")
+            default_log.debug(f"      No, finding closest preceding node")
             if logging_on:
                 request.debug(f"      No, finding closest preceding node")
             next_node = self.find_next_node(digest, logging_on)
@@ -71,10 +71,10 @@ class VirtualNode:
         return self.successor
 
     def notify(self, other):
-        logging.debug(f'Node {self.routing_info.digest} notified by node {other.digest}')
+        default_log.debug(f'Node {self.routing_info.digest} notified by node {other.digest}')
         if not self.predecessor \
                 or open_open(self.predecessor.digest, self.routing_info.digest, other.digest):
-            logging.debug(f'Node {self.routing_info.digest} updating predecessor')
+            default_log.debug(f'Node {self.routing_info.digest} updating predecessor')
             self.predecessor = other
 
     def update_successor(self, other):
@@ -94,16 +94,16 @@ class ChordVirtualNode(VirtualNode):
             if not finger:
                 continue
 
-            logging.debug(f"      Is {finger.digest} in ({self.routing_info.digest, digest})?")
+            default_log.debug(f"      Is {finger.digest} in ({self.routing_info.digest, digest})?")
             if logging_on:
                 request.debug(f"      Is {finger.digest} in ({self.routing_info.digest, digest})?")
             if open_open(self.routing_info.digest, digest, finger.digest):
-                logging.debug(f"        Yes, returning finger {finger.digest}")
+                default_log.debug(f"        Yes, returning finger {finger.digest}")
                 if logging_on:
                     request.debug(f"        Yes, returning finger {finger.digest}")
                 return finger
 
-        logging.debug(f"      Finger not found. Returning successor {self.successor.digest}")
+        default_log.debug(f"      Finger not found. Returning successor {self.successor.digest}")
         if logging_on:
             request.debug(f"      Finger not found. Returning successor {self.successor.digest}")
         return self.successor
@@ -236,7 +236,7 @@ class Node:
         return len(self.virtual_nodes)
 
     def join(self, known_id, known_address):
-        logging.debug(f'Node {self.digest_id} at {self.internal_endpoint} joining '
+        default_log.debug(f'Node {self.digest_id} at {self.internal_endpoint} joining '
                       f'known node {known_id} at {known_address}')
 
         for v_node in self.virtual_nodes.values():
@@ -253,7 +253,7 @@ class Node:
         cmd = FindSuccessorCommand(search_digest=virtual_node.get_digest(),
                                    initiator=virtual_node.routing_info,
                                    recipient=recipient)
-        logging.debug(f'Virtual node {virtual_node.get_digest()} is sending command: {cmd}')
+        default_log.debug(f'Virtual node {virtual_node.get_digest()} is sending command: {cmd}')
         self.route_result(known_address, known_id, cmd)
 
         # Block waiting for result. We can't start execution without know our successor
@@ -266,7 +266,7 @@ class Node:
         if virtual_node.successor.get_digest() == virtual_node.get_digest():
             return False
 
-        logging.debug(f'Node {virtual_node.get_digest()} initialized successor '
+        default_log.debug(f'Node {virtual_node.get_digest()} initialized successor '
                       f'{virtual_node.successor.get_digest()} at {virtual_node.successor.get_address()}')
         return True
 
@@ -283,13 +283,13 @@ class Node:
             pair.close()
 
     def _stabilize(self, pair):
-        logging.debug(f'Node {self.digest_id} running stabilize')
+        default_log.debug(f'Node {self.digest_id} running stabilize')
 
         for v_node in self.virtual_nodes.values():
-            logging.debug(f'Node {v_node.get_digest()} updating successor {v_node.successor.get_digest()}')
+            default_log.debug(f'Node {v_node.get_digest()} updating successor {v_node.successor.get_digest()}')
             self._get_predecessor(pair, v_node)
 
-            logging.debug(f'Node {v_node.get_digest()} notifying successor {v_node.successor.get_digest()}')
+            default_log.debug(f'Node {v_node.get_digest()} notifying successor {v_node.successor.get_digest()}')
             self._notify_successor(pair, v_node)
 
     @staticmethod
@@ -304,11 +304,11 @@ class Node:
         if pair.poll(STABILIZE_WAIT, zmq.POLLIN) == zmq.POLLIN:
             success = pair.recv_pyobj()
             if not success:
-                logging.warning(f'Node {v_node.get_parent()} unable to update successor for '
+                default_log.warning(f'Node {v_node.get_parent()} unable to update successor for '
                                 f'virtual node {v_node.get_digest()}')
         else:
             # TODO implement successor lists to handle cases where successor fails
-            logging.debug(f'Node {v_node.get_parent()}, Virtual Node {v_node.get_digest()} stabilize did not receive '
+            default_log.debug(f'Node {v_node.get_parent()}, Virtual Node {v_node.get_digest()} stabilize did not receive '
                           f'response from successor in {STABILIZE_WAIT} milliseconds. Continuing')
 
     @staticmethod
@@ -337,12 +337,12 @@ class Node:
 
     def _fix_fingers(self, pair):
         for v_node in self.virtual_nodes.values():
-            logging.debug(f"Building finger table for {v_node.name} (Digest: {v_node.get_digest()})")
+            default_log.debug(f"Building finger table for {v_node.name} (Digest: {v_node.get_digest()})")
 
             random_index = random.randint(0, NUM_BITS - 1)
             next_key = (v_node.get_digest() + pow(2, random_index)) % (pow(2, NUM_BITS) - random_index)
             self._find_successor(pair, next_key, v_node.routing_info, random_index)
-            logging.debug(f"  Found finger {random_index} is successor({next_key}) = {v_node.fingers[random_index]}")
+            default_log.debug(f"  Found finger {random_index} is successor({next_key}) = {v_node.fingers[random_index]}")
 
     @staticmethod
     def _find_successor(pair, digest, initiator, index):
@@ -357,41 +357,41 @@ class Node:
         if pair.poll(STABILIZE_WAIT, zmq.POLLIN) == zmq.POLLIN:
             success = pair.recv_pyobj()
             if not success:
-                logging.error(f'Node {initiator.get_parent()} unable to update finger {index} '
+                default_log.error(f'Node {initiator.get_parent()} unable to update finger {index} '
                               f'on virtual node {initiator.get_digest()}')
         else:
-            logging.debug(f'Node {initiator.get_parent()}, Virtual Node {initiator.get_digest()}: fix fingers did '
+            default_log.debug(f'Node {initiator.get_parent()}, Virtual Node {initiator.get_digest()}: fix fingers did '
                           f'not receive response in {FIX_FINGERS_WAIT} milliseconds. Continuing.')
 
     def run(self, stabilize_interval=5, fix_fingers_interval=7):
-        logging.info(f'Starting loop for node {self.digest_id}')
-        logging.info(f'Node {self.digest_id} managing virtual nodes: {self.virtual_nodes.keys()}')
+        default_log.info(f'Starting loop for node {self.digest_id}')
+        default_log.info(f'Node {self.digest_id} managing virtual nodes: {self.virtual_nodes.keys()}')
 
         # Create PAIR socket for stabilize
         stability = self.context.socket(zmq.PAIR)
         stability.setsockopt(zmq.LINGER, 0)
         stability.bind(self.stabilize_address)
-        logging.debug(f'Stabilize using address {self.stabilize_address}')
+        default_log.debug(f'Stabilize using address {self.stabilize_address}')
 
         # Create PAIR socket for fix_fingers
         fix_fingers = self.context.socket(zmq.PAIR)
         fix_fingers.setsockopt(zmq.LINGER, 0)
         fix_fingers.bind(self.fix_fingers_address)
-        logging.debug(f'Fix fingers using address {self.fix_fingers_address}')
+        default_log.debug(f'Fix fingers using address {self.fix_fingers_address}')
 
         # Create Poller to listen for messages on all sockets
         poller = zmq.Poller()
         poller.register(self.receiver, zmq.POLLIN)
         poller.register(stability, zmq.POLLIN)
         poller.register(fix_fingers, zmq.POLLIN)
-        logging.debug('Poller listening to receiver, stability, and fix_fingers')
+        default_log.debug('Poller listening to receiver, stability, and fix_fingers')
 
         shutdown_event = threading.Event()
-        logging.debug('Created shutdown event')
+        default_log.debug('Created shutdown event')
 
         # Start stabilize thread
         if stabilize_interval:
-            logging.debug('Starting stabilize thread...')
+            default_log.debug('Starting stabilize thread...')
             stability_t = threading.Thread(target=self.run_stabilize,
                                            args=[self.context, stabilize_interval, shutdown_event],
                                            daemon=True)
@@ -399,7 +399,7 @@ class Node:
 
         # Start fix fingers thread
         if fix_fingers_interval:
-            logging.debug('Starting fix fingers thread...')
+            default_log.debug('Starting fix fingers thread...')
             fix_fingers_t = threading.Thread(target=self.run_fix_fingers,
                                              args=[self.context, fix_fingers_interval, shutdown_event],
                                              daemon=True)
@@ -408,15 +408,15 @@ class Node:
         try:
             while True:
 
-                logging.debug(f'Node {self.digest_id} waiting for messages')
+                default_log.debug(f'Node {self.digest_id} waiting for messages')
                 socks = dict(poller.poll())
                 received_exit = self.process_input(socks, stability, fix_fingers)
                 if received_exit:
                     shutdown_event.set()
                     break
 
-            logging.info(f'Node {self.digest_id} shutting down...')
-            logging.info(f'Node state: {[vars(v_node) for v_node in self.virtual_nodes.values()]}')
+            default_log.info(f'Node {self.digest_id} shutting down...')
+            default_log.info(f'Node state: {[vars(v_node) for v_node in self.virtual_nodes.values()]}')
 
         # TODO notify successors and predecessors of known departure
 
@@ -424,7 +424,7 @@ class Node:
             e = sys.exc_info()
             request.debug(f'Caught something: {e[0]}, {e[1]}, {str(e[2])}')
         finally:
-            logging.debug(f'Node {self.digest_id} destroying context...')
+            default_log.debug(f'Node {self.digest_id} destroying context...')
             request.debug(f'Node {self.digest_id} destroying context...')
 
             fix_fingers_t.join()
@@ -438,21 +438,21 @@ class Node:
 
             self.shutdown = True
 
-        logging.info(f'Node {self.digest_id} says Goodbye!')
+        default_log.info(f'Node {self.digest_id} says Goodbye!')
 
     def process_input(self, socks, stability, fix_fingers):
-        logging.debug(f'Node {self.digest_id} processing {len(socks)} messages')
+        default_log.debug(f'Node {self.digest_id} processing {len(socks)} messages')
         for sock in socks:
 
             # Receive command object
             command = sock.recv_pyobj()
-            logging.debug(f'Node {self.digest_id} received command {command}')
+            default_log.debug(f'Node {self.digest_id} received command {command}')
 
             if isinstance(command, FindSuccessorCommand) and command.initiator.digest != 1:
                 request.debug(f'Node {self.digest_id} received command {command}')
 
             if command == EXIT_COMMAND:
-                logging.debug(f'Node {self.digest_id} received EXIT message. Node shutting down.')
+                default_log.debug(f'Node {self.digest_id} received EXIT message. Node shutting down.')
                 return True
 
             # Process the command
@@ -473,7 +473,7 @@ class Node:
             return False
 
     def route_result(self, address, identity, command):
-        logging.debug(f'Node {self.digest_id} sending {command} to node {identity} at {address}')
+        default_log.debug(f'Node {self.digest_id} sending {command} to node {identity} at {address}')
         if address not in self.connected:
             self.connected.add(address)
             self.router.connect(address)
@@ -541,7 +541,7 @@ class NotifyCommand(Command):
         elif self.recipient.digest in node.virtual_nodes:
             node.virtual_nodes[self.recipient.digest].notify(self.initiator)
         else:
-            logging.error(f'Node {node.digest_id} unable to execute {self}')
+            default_log.error(f'Node {node.digest_id} unable to execute {self}')
 
 
 class PredecessorCommand(Command):
@@ -568,7 +568,7 @@ class PredecessorCommand(Command):
             node.virtual_nodes[self.initiator.digest].update_successor(self.successors_predecessor)
             return RoutingInfo(address=node.stabilize_address)
         else:
-            logging.error(f'Node {node.digest_id} unable to execute {self}')
+            default_log.error(f'Node {node.digest_id} unable to execute {self}')
 
 
 class FindSuccessorCommand(Command):
@@ -588,7 +588,7 @@ class FindSuccessorCommand(Command):
         self.logging_on = False
 
     def execute(self, node):
-        logging.debug(f'Node {node.digest_id} executing command: {vars(self)}')
+        default_log.debug(f'Node {node.digest_id} executing command: {vars(self)}')
 
         if self.initiator.digest != 1:
             request.debug(f'Current state: {self}')
@@ -609,7 +609,7 @@ class FindSuccessorCommand(Command):
                 request.debug(f'Left find_successor: {self.found}, {self.recipient}, {self.hops}')
             return self.forward_result()
         else:
-            logging.error(f'Node {node.digest_id} unable to execute {self}')
+            default_log.error(f'Node {node.digest_id} unable to execute {self}')
             request.error(f'Unable to execute')
 
     def client_response(self):

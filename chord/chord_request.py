@@ -14,7 +14,7 @@ empty_routing_info = RoutingInfo(address='')
 
 
 def wait_for_response(receiver):
-    event = receiver.poll(700, zmq.POLLIN)
+    event = receiver.poll(10 * 1000, zmq.POLLIN)
     if event == zmq.POLLIN:
         return receiver.recv_pyobj().recipient
     else:

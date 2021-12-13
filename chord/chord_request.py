@@ -1,4 +1,5 @@
 import argparse
+import random
 import socket
 import struct
 import time
@@ -62,17 +63,19 @@ def main():
     me = RoutingInfo(address=endpoint, digest=id, parent_digest=id)
     cn = RoutingInfo(address=bootstrap_endpoint, digest=bootstrap_id, parent_digest=bootstrap_id)
 
+    print('Running tests...')
     file = open('times.csv', 'w')
     for i in range(num_trials):
         future = executor.submit(wait_for_response, receiver=receiver)
         time.sleep(1)
 
         # print('Creating find successor command')
+        search_term = random.randrange(0, 255)
         cmd = FindSuccessorCommand(initiator=me, recipient=cn, search_digest=search_term)
 
         # Send message
         # print(f'Chord Node: {bootstrap_endpoint} ({bootstrap_id})')
-        # print(f'Command: {cmd}')
+        print(f'Command: {cmd}')
         start = time.time()
         router.send(struct.pack('i', bootstrap_id), zmq.SNDMORE)
         router.send_pyobj(cmd)

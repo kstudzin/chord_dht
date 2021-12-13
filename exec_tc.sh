@@ -1,4 +1,4 @@
-pods=kubectl get pods -n chord | awk '{print $1}'`
+pods=`kubectl get pods -n chord | awk '{print $1}'`
 
 for i in "${pods[@]}"
 do

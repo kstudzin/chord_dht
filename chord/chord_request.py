@@ -6,12 +6,14 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
+import requests
 import zmq
 
 from node import RoutingInfo, FindSuccessorCommand
 
 default_trials = 1000
 empty_routing_info = RoutingInfo(address='')
+url = "204.236.223.42:30495/api/v1/query?query=avg(sum_over_time(kube_pod_status_phase{phase=\"Running\", namespace='chord'}[3h]) * 3 * 30)"
 
 
 def wait_for_response(receiver):
@@ -32,6 +34,11 @@ def config_parser():
     parser.add_argument('--port', default='5550')
 
     return parser
+
+
+def get_average_session(runtime_seconds):
+    response = requests.request("GET", url)
+    return float(response.data.result.value[1])
 
 
 def main():
@@ -118,6 +125,9 @@ def main():
 
         i += 1
         curr_time = time.time()
+
+    avg_session = get_average_session(runtime_seconds)
+    print(f'Average session time: {avg_session}')
 
     file.close()
     executor.shutdown()

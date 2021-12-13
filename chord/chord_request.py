@@ -4,6 +4,7 @@ import socket
 import struct
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 
 import zmq
 
@@ -26,6 +27,7 @@ def config_parser():
 
     parser.add_argument('--search')
     parser.add_argument('bootstrap_endpoint')
+    parser.add_argument('runtime')
     parser.add_argument('--id', default=256)
     parser.add_argument('--port', default='5550')
 
@@ -39,6 +41,8 @@ def main():
     bootstrap_endpoint = args.bootstrap_endpoint
     id = int(args.id)
     port = args.port
+    runtime = datetime.strptime(args.runtime, '%H:%M:%S,%f')
+    runtime_seconds = runtime.second + runtime.minute * 60 + runtime.hour * 3600
 
     if args.search:
         search_term = int(args.search)
@@ -77,12 +81,15 @@ def main():
 
     print('Running tests...')
     file = open('times.csv', 'w')
-    for i in range(num_trials):
+    init_time = time.time()
+    curr_time = init_time
+    i = 0
+    while curr_time < init_time + runtime:
         future = executor.submit(wait_for_response, receiver=receiver)
         time.sleep(1)
 
         if i % 100:
-            print(f'Completed {i} iterations')
+            print(f'Elapsed time: {init_time - curr_time} of {runtime} seconds')
 
         # print('Creating find successor command')
         if random_search:
@@ -108,6 +115,9 @@ def main():
 
         print(csv)
         file.write(csv)
+
+        i += 1
+        curr_time = time.time()
 
     file.close()
     executor.shutdown()

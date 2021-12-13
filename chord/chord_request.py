@@ -89,7 +89,7 @@ def main():
         time.sleep(1)
 
         if i % 100:
-            print(f'Elapsed time: {init_time - curr_time} of {runtime_seconds} seconds')
+            print(f'Elapsed time: {curr_time - init_time} of {runtime_seconds} seconds')
 
         # print('Creating find successor command')
         if random_search:

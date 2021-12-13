@@ -28,4 +28,8 @@ spec:
                "--known-endpoint", "tcp://10.99.61.226:5555",
                "--known-name", "1"
         ]
+        securityContext:
+          capabilities:
+            add:
+              - NET_ADMIN
 ...

@@ -26,4 +26,8 @@ spec:
                "--internal-port", "5555",
                "--external-port","5556"
         ]
+        securityContext:
+          capabilities:
+            add:
+              - NET_ADMIN
 ...

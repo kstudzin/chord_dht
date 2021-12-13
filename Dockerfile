@@ -1,7 +1,7 @@
 FROM ubuntu:latest
 
 RUN apt-get update \
-    && apt install -y python3 python3-pip libzmq3-dev vim \
+    && apt install -y python3 python3-pip libzmq3-dev vim iproute2 \
     && pip install pyzmq \
     && mkdir /opt/chord
 

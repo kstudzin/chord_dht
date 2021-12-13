@@ -9,7 +9,7 @@ import zmq
 
 from node import RoutingInfo, FindSuccessorCommand
 
-default_trials = 10
+default_trials = 1000
 empty_routing_info = RoutingInfo(address='')
 
 
@@ -99,9 +99,9 @@ def main():
         end = time.time()
 
         if result.digest:
-            csv = f'{result.digest},{result.address},{end - start}\n'
+            csv = f'{search_term},{result.digest},{result.address},{end - start}\n'
         else:
-            csv = f'{result.digest},{result.address},\n'
+            csv = f'{search_term},{result.digest},{result.address},\n'
 
         print(csv)
         file.write(csv)

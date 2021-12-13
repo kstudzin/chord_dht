@@ -36,12 +36,18 @@ def main():
     parser = config_parser()
     args = parser.parse_args()
 
-    search_term = int(args.search)
     bootstrap_endpoint = args.bootstrap_endpoint
     id = int(args.id)
     port = args.port
-    random_search = True if args.search is None else False
-    num_trials = default_trials if args.search is None else 1
+
+    if args.search:
+        search_term = int(args.search)
+        random_search = False
+        num_trials = 1
+    else:
+        search_term = None
+        random_search = True
+        num_trials = default_trials
 
     bootstrap_id = 1
     endpoint = f'tcp://{socket.gethostbyname(socket.gethostname())}:{port}'

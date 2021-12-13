@@ -13,8 +13,8 @@ from node import RoutingInfo, FindSuccessorCommand
 
 default_trials = 1000
 empty_routing_info = RoutingInfo(address='')
-url = "http://204.236.223.42:30495/api/v1/query?query=avg(sum_over_time(kube_pod_status_phase{phase='Running', " \
-      "namespace='chord'}[{time}s]) * 30) "
+url = "http://204.236.223.42:30495/api/v1/query?query=avg(sum_over_time(kube_pod_status_phase{{phase='Running', " \
+      "namespace='chord'}}[{time}s]) * 30) "
 
 
 def wait_for_response(receiver):

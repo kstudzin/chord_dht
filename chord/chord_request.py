@@ -35,7 +35,7 @@ def main():
     bootstrap_endpoint = args.bootstrap_endpoint
     id = int(args.id)
     port = args.port
-    random_search = False if args.search is None else True
+    random_search = True if args.search is None else False
     num_trials = default_trials if args.search is None else 1
 
     bootstrap_id = 1

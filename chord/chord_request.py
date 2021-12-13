@@ -13,7 +13,7 @@ from node import RoutingInfo, FindSuccessorCommand
 
 default_trials = 1000
 empty_routing_info = RoutingInfo(address='')
-url = "204.236.223.42:30495/api/v1/query?query=avg(sum_over_time(kube_pod_status_phase{phase=\"Running\", namespace='chord'}[3h]) * 3 * 30)"
+url = "http://204.236.223.42:30495/api/v1/query?query=avg(sum_over_time(kube_pod_status_phase{phase=\"Running\", namespace='chord'}[3h]) * 3 * 30)"
 
 
 def wait_for_response(receiver):
@@ -95,7 +95,7 @@ def main():
         future = executor.submit(wait_for_response, receiver=receiver)
         time.sleep(1)
 
-        if i % 100:
+        if i % 100 == 0:
             print(f'Elapsed time: {curr_time - init_time} of {runtime_seconds} seconds')
 
         # print('Creating find successor command')

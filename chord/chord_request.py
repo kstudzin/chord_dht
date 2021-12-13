@@ -9,7 +9,7 @@ import zmq
 
 from node import RoutingInfo, FindSuccessorCommand
 
-num_trials = 10
+default_trials = 10
 
 
 def wait_for_response(receiver):
@@ -19,7 +19,7 @@ def wait_for_response(receiver):
 def config_parser():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('search_term')
+    parser.add_argument('--search')
     parser.add_argument('bootstrap_endpoint')
     parser.add_argument('--id', default=256)
     parser.add_argument('--port', default='5550')
@@ -31,14 +31,15 @@ def main():
     parser = config_parser()
     args = parser.parse_args()
 
-    search_term = int(args.search_term)
+    search_term = int(args.search)
     bootstrap_endpoint = args.bootstrap_endpoint
     id = int(args.id)
     port = args.port
+    random_search = False if args.search is None else True
+    num_trials = default_trials if args.search is None else 1
 
     bootstrap_id = 1
     endpoint = f'tcp://{socket.gethostbyname(socket.gethostname())}:{port}'
-
 
     # Start dealer waiting
     print('Creating ZMQ Context')
@@ -70,7 +71,8 @@ def main():
         time.sleep(1)
 
         # print('Creating find successor command')
-        search_term = random.randrange(0, 255)
+        if random_search:
+            search_term = random.randrange(0, 255)
         cmd = FindSuccessorCommand(initiator=me, recipient=cn, search_digest=search_term)
 
         # Send message

@@ -81,6 +81,9 @@ def main():
         future = executor.submit(wait_for_response, receiver=receiver)
         time.sleep(1)
 
+        if i % 100:
+            print(f'Completed {i} iterations')
+
         # print('Creating find successor command')
         if random_search:
             search_term = random.randrange(0, 255)

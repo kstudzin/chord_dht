@@ -127,8 +127,9 @@ def main():
         i += 1
         curr_time = time.time()
 
-    avg_session = get_average_session(runtime_seconds)
-    print(f'Average session time: {avg_session} seconds')
+    if runtime_seconds >= 30:
+        avg_session = get_average_session(runtime_seconds)
+        print(f'Average session time: {avg_session} seconds')
 
     file.close()
     executor.shutdown()

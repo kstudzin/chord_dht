@@ -128,7 +128,7 @@ def main():
         curr_time = time.time()
 
     avg_session = get_average_session(runtime_seconds)
-    print(f'Average session time: {avg_session}')
+    print(f'Average session time: {avg_session} seconds')
 
     file.close()
     executor.shutdown()

@@ -84,12 +84,12 @@ def main():
     init_time = time.time()
     curr_time = init_time
     i = 0
-    while curr_time < init_time + runtime:
+    while curr_time < init_time + runtime_seconds:
         future = executor.submit(wait_for_response, receiver=receiver)
         time.sleep(1)
 
         if i % 100:
-            print(f'Elapsed time: {init_time - curr_time} of {runtime} seconds')
+            print(f'Elapsed time: {init_time - curr_time} of {runtime_seconds} seconds')
 
         # print('Creating find successor command')
         if random_search:

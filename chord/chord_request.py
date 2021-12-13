@@ -10,10 +10,15 @@ import zmq
 from node import RoutingInfo, FindSuccessorCommand
 
 default_trials = 10
+empty_routing_info = RoutingInfo(address='')
 
 
 def wait_for_response(receiver):
-    return receiver.recv_pyobj().recipient
+    event = receiver.poll(700, zmq.POLLIN)
+    if event == zmq.POLLIN:
+        return receiver.recv_pyobj().recipient
+    else:
+        return empty_routing_info
 
 
 def config_parser():
@@ -87,7 +92,13 @@ def main():
         result = future.result()
         end = time.time()
 
-        file.write(f'{result.digest},{result.address},{end - start}\n')
+        if result.digest:
+            csv = f'{result.digest},{result.address},{end - start}\n'
+        else:
+            csv = f'{result.digest},{result.address},\n'
+
+        print(csv)
+        file.write(csv)
 
     file.close()
     executor.shutdown()

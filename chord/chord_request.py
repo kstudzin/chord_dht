@@ -13,8 +13,8 @@ from node import RoutingInfo, FindSuccessorCommand
 
 default_trials = 1000
 empty_routing_info = RoutingInfo(address='')
-url = "http://204.236.223.42:30495/api/v1/query?query=avg(sum_over_time(kube_pod_status_phase{phase=\"Running\", " \
-      "namespace='chord'}[{0}s]) * 30) "
+url = "http://204.236.223.42:30495/api/v1/query?query=avg(sum_over_time(kube_pod_status_phase{phase='Running', " \
+      "namespace='chord'}[{time}s]) * 30) "
 
 
 def wait_for_response(receiver):
@@ -38,7 +38,7 @@ def config_parser():
 
 
 def get_average_session(runtime_seconds):
-    response = requests.request("GET", url.format(runtime_seconds))
+    response = requests.request("GET", url.format(time=runtime_seconds))
     return float(response.json()['data']['result'][0]['value'][1])
 
 

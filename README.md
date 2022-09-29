@@ -1,6 +1,6 @@
 # cs6381-assignment2
 
-Chord DHT Implementation fof CS 6381 Distributed Systems
+Chord DHT Implementation for CS 6381 Distributed Systems
 
 ## Setup
 
